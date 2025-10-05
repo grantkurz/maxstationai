@@ -49,6 +49,9 @@ export default async function Navbar() {
             <Link href="/overview" className="text-sm font-medium hover:text-primary transition-colors">
               Home
             </Link>
+            <Link href="/events" className="text-sm font-medium hover:text-primary transition-colors">
+              Events
+            </Link>
             {packsIsEnabled && (
               <Link href="/overview/packs" className="text-sm font-medium hover:text-primary transition-colors">
                 Packs

@@ -45,6 +45,18 @@ You will design and implement user interfaces that:
 - Maintain consistency with shadcn's design patterns while adapting to project needs
 - Understand when to build custom components vs. using shadcn primitives
 
+**AI SDK 5 by Vercel:**
+- Use AI SDK 5 by Vercel
+- Example: 
+```
+import { generateText } from "ai"
+import { anthropic } from "@ai-sdk/anthropic"
+const { text } = await generateText({
+model: anthropic("claude-sonnet-4-5-20250929"),
+prompt: "What is love?"
+})
+```
+
 ## Design Philosophy
 
 **First Principles Approach:**

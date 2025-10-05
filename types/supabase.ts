@@ -37,6 +37,58 @@ export interface Database {
           }
         ]
       }
+      events: {
+        Row: {
+          id: number
+          created_at: string
+          updated_at: string
+          user_id: string
+          title: string
+          date: string
+          location: string
+          start_time: string
+          end_time: string
+          description: string | null
+          timezone: string
+          type: string
+        }
+        Insert: {
+          id?: number
+          created_at?: string
+          updated_at?: string
+          user_id: string
+          title: string
+          date: string
+          location: string
+          start_time: string
+          end_time: string
+          description?: string | null
+          timezone?: string
+          type?: string
+        }
+        Update: {
+          id?: number
+          created_at?: string
+          updated_at?: string
+          user_id?: string
+          title?: string
+          date?: string
+          location?: string
+          start_time?: string
+          end_time?: string
+          description?: string | null
+          timezone?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       images: {
         Row: {
           created_at: string
@@ -126,6 +178,49 @@ export interface Database {
             foreignKeyName: "samples_modelId_fkey"
             columns: ["modelId"]
             referencedRelation: "models"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      speakers: {
+        Row: {
+          id: number
+          created_at: string
+          updated_at: string
+          event_id: number
+          name: string
+          speaker_title: string
+          speaker_bio: string | null
+          session_title: string
+          session_description: string | null
+        }
+        Insert: {
+          id?: number
+          created_at?: string
+          updated_at?: string
+          event_id: number
+          name: string
+          speaker_title: string
+          speaker_bio?: string | null
+          session_title: string
+          session_description?: string | null
+        }
+        Update: {
+          id?: number
+          created_at?: string
+          updated_at?: string
+          event_id?: number
+          name?: string
+          speaker_title?: string
+          speaker_bio?: string | null
+          session_title?: string
+          session_description?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "speakers_event_id_fkey"
+            columns: ["event_id"]
+            referencedRelation: "events"
             referencedColumns: ["id"]
           }
         ]
