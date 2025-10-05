@@ -10,6 +10,7 @@ import { useState } from "react";
 import { SubmitHandler, useForm } from "react-hook-form";
 import { AiOutlineGoogle } from "react-icons/ai";
 import { WaitingForMagicLink } from "./WaitingForMagicLink";
+import { OtpInput } from "./OtpInput";
 
 type Inputs = {
   email: string;
@@ -25,6 +26,8 @@ export const Login = ({
   const supabase = createClientComponentClient<Database>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMagicLinkSent, setIsMagicLinkSent] = useState(false);
+  const [isOtpMode, setIsOtpMode] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState("");
   const { toast } = useToast();
 
   const {
@@ -37,14 +40,15 @@ export const Login = ({
     setIsSubmitting(true);
     try {
       await signInWithMagicLink(data.email);
+      setSubmittedEmail(data.email);
       setTimeout(() => {
         setIsSubmitting(false);
         toast({
-          title: "Email sent",
-          description: "Check your inbox for a magic link to sign in.",
+          title: "Code sent",
+          description: "Check your email for a 6-digit code.",
           duration: 5000,
         });
-        setIsMagicLinkSent(true);
+        setIsOtpMode(true);
       }, 1000);
     } catch (error) {
       setIsSubmitting(false);
@@ -91,6 +95,18 @@ export const Login = ({
       console.log(`Error: ${error.message}`);
     }
   };
+
+  if (isOtpMode) {
+    return (
+      <OtpInput
+        email={submittedEmail}
+        onBack={() => {
+          setIsOtpMode(false);
+          setSubmittedEmail("");
+        }}
+      />
+    );
+  }
 
   if (isMagicLinkSent) {
     return (
