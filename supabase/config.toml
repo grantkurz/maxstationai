@@ -126,6 +126,13 @@ redirect_uri = ""
 # or any other third-party OIDC providers.
 url = ""
 
+[auth.external.linkedin_oidc]
+enabled = true
+client_id = "env(SUPABASE_AUTH_EXTERNAL_LINKEDIN_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_LINKEDIN_SECRET)"
+redirect_uri = ""
+url = ""
+
 [analytics]
 enabled = false
 port = 54327

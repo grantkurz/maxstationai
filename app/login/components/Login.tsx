@@ -8,7 +8,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import disposableDomains from "disposable-email-domains";
 import { useState } from "react";
 import { SubmitHandler, useForm } from "react-hook-form";
-import { AiOutlineGoogle } from "react-icons/ai";
+import { AiOutlineGoogle, AiOutlineLinkedin } from "react-icons/ai";
 import { WaitingForMagicLink } from "./WaitingForMagicLink";
 import { OtpInput } from "./OtpInput";
 
@@ -83,6 +83,26 @@ export const Login = ({
     console.log(data, error);
   };
 
+  const signInWithLinkedIn = async () => {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "linkedin_oidc",
+      options: {
+        redirectTo: redirectUrl,
+        scopes: "openid profile email",
+      },
+    });
+
+    if (error) {
+      console.log(`LinkedIn OAuth Error: ${error.message}`);
+      toast({
+        title: "Authentication failed",
+        variant: "destructive",
+        description: "Unable to sign in with LinkedIn. Please try again.",
+        duration: 5000,
+      });
+    }
+  };
+
   const signInWithMagicLink = async (email: string) => {
     const { error } = await supabase.auth.signInWithOtp({
       email,
@@ -122,15 +142,15 @@ export const Login = ({
           <p className="text-xs opacity-60">
             Sign in or create an account to get started.
           </p>
-          {/* <Button
-            onClick={signInWithGoogle}
+          <Button
+            onClick={signInWithLinkedIn}
             variant={"outline"}
             className="font-semibold"
           >
-            <AiOutlineGoogle size={20} />
-            Continue with Google
+            <AiOutlineLinkedin size={20} />
+            Continue with LinkedIn
           </Button>
-          <OR /> */}
+          <OR />
 
           <form
             onSubmit={handleSubmit(onSubmit)}

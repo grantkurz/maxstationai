@@ -219,3 +219,154 @@ Before finalizing any solution, verify:
 - [ ] Performance implications are considered
 
 When you need clarification on requirements, business logic, or constraints, proactively ask specific questions. Your goal is to deliver production-ready, secure, and performant backend solutions that scale.
+
+---
+
+# LinkedIn OAuth Setup Guide
+
+## Overview
+This application now supports LinkedIn OAuth authentication. Users can sign in with their LinkedIn account to access the platform.
+
+## Configuration Steps
+
+### 1. Create LinkedIn OAuth App
+
+1. Go to [LinkedIn Developers](https://www.linkedin.com/developers/apps)
+2. Click "Create app"
+3. Fill in the required information:
+   - App name: EventStation AI
+   - LinkedIn Page: Your company page
+   - App logo: Your app logo
+   - Privacy policy URL: Your privacy policy
+   - Terms of service URL: Your terms of service
+4. After creation, go to the "Auth" tab
+5. Add authorized redirect URLs:
+   - **Local Development**: `http://localhost:54321/auth/v1/callback`
+   - **Production**: `https://your-project-ref.supabase.co/auth/v1/callback`
+6. Note down:
+   - **Client ID**
+   - **Client Secret**
+
+### 2. Configure Supabase (Production)
+
+1. Go to your Supabase project dashboard
+2. Navigate to **Authentication > Providers**
+3. Find **LinkedIn** in the provider list
+4. Enable LinkedIn and enter:
+   - **Client ID**: From LinkedIn OAuth app
+   - **Client Secret**: From LinkedIn OAuth app
+5. Save changes
+
+### 3. Configure Local Development
+
+Add environment variables to your `.env.local`:
+
+```bash
+SUPABASE_AUTH_EXTERNAL_LINKEDIN_CLIENT_ID=your_linkedin_client_id
+SUPABASE_AUTH_EXTERNAL_LINKEDIN_SECRET=your_linkedin_client_secret
+```
+
+The `supabase/config.toml` file is already configured to use these environment variables.
+
+### 4. Restart Supabase (Local)
+
+```bash
+supabase stop
+supabase start
+```
+
+## Accessing LinkedIn Tokens
+
+After a user authenticates with LinkedIn, you can access their LinkedIn tokens:
+
+```typescript
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
+
+const supabase = createServerComponentClient({ cookies })
+const { data: { session } } = await supabase.auth.getSession()
+
+if (session?.provider_token) {
+  // LinkedIn access token
+  const accessToken = session.provider_token
+
+  // LinkedIn refresh token (if available)
+  const refreshToken = session.provider_refresh_token
+
+  // Use these tokens to call LinkedIn APIs
+}
+```
+
+## Getting LinkedIn URN (User ID)
+
+To get the LinkedIn Owner URN, you need to call LinkedIn's API:
+
+```typescript
+// After getting the access token from session
+const response = await fetch('https://api.linkedin.com/v2/userinfo', {
+  headers: {
+    'Authorization': `Bearer ${accessToken}`
+  }
+})
+
+const userData = await response.json()
+// userData.sub contains the LinkedIn URN
+```
+
+## Implementation Details
+
+### Login Component
+- File: `app/login/components/Login.tsx`
+- Added `signInWithLinkedIn()` function
+- LinkedIn button with icon in the login UI
+
+### OAuth Callback
+- File: `app/auth/callback/route.ts`
+- Already handles LinkedIn OAuth (works for all providers)
+- No changes needed
+
+### Supabase Config
+- File: `supabase/config.toml`
+- LinkedIn OIDC provider configured
+- Uses environment variables for secrets
+
+## Security Notes
+
+- **Never commit credentials to git**: Use environment variables
+- **Provider tokens expire**: Implement refresh logic if storing tokens
+- **RLS policies apply**: User access control works regardless of auth provider
+- **Scopes**: Current implementation requests `openid profile email`
+
+## Storing LinkedIn Data (Optional)
+
+If you need to store LinkedIn-specific data like URN, create a new table:
+
+```sql
+CREATE TABLE user_linkedin (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  linkedin_urn TEXT NOT NULL,
+  access_token TEXT,
+  refresh_token TEXT,
+  token_expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLS Policies
+ALTER TABLE user_linkedin ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own LinkedIn data"
+  ON user_linkedin FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own LinkedIn data"
+  ON user_linkedin FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own LinkedIn data"
+  ON user_linkedin FOR UPDATE
+  USING (auth.uid() = user_id);
+```
+
+Then create an API endpoint to fetch and store LinkedIn profile data after authentication.
