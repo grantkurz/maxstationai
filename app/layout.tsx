@@ -18,8 +18,8 @@ export const viewport = {
 };
 
 export const metadata = {
-  title: "Headshots AI",
-  description: "Generate awesome headshots in minutes using AI",
+  title: "MaxStation AI",
+  description: "Generate awesome event marketing in minutes using AI",
 };
 
 export default function RootLayout({
