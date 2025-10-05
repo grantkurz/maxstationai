@@ -51,6 +51,7 @@ export interface Database {
           description: string | null
           timezone: string
           type: string
+          ticket_url: string | null
         }
         Insert: {
           id?: number
@@ -65,6 +66,7 @@ export interface Database {
           description?: string | null
           timezone?: string
           type?: string
+          ticket_url?: string | null
         }
         Update: {
           id?: number
@@ -79,6 +81,7 @@ export interface Database {
           description?: string | null
           timezone?: string
           type?: string
+          ticket_url?: string | null
         }
         Relationships: [
           {

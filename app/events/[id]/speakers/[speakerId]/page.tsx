@@ -10,14 +10,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { GenerateAnnouncementButton } from "@/components/events/GenerateAnnouncementButton";
 
 export const dynamic = "force-dynamic";
 
 export default async function SpeakerDetailPage({
   params,
 }: {
-  params: { id: string; speakerId: string };
+  params: Promise<{ id: string; speakerId: string }>;
 }) {
+  const { id, speakerId } = await params;
   const supabase = createServerComponentClient<Database>({ cookies });
 
   const {
@@ -31,7 +33,7 @@ export default async function SpeakerDetailPage({
   const { data: event } = await supabase
     .from("events")
     .select("*")
-    .eq("id", params.id)
+    .eq("id", id)
     .eq("user_id", user.id)
     .single();
 
@@ -39,15 +41,18 @@ export default async function SpeakerDetailPage({
     redirect("/events");
   }
 
-  const { data: speaker } = await supabase
+  const { data: speaker, error: speakerError } = await supabase
     .from("speakers")
     .select("*")
-    .eq("id", params.speakerId)
-    .eq("event_id", params.id)
+    .eq("id", speakerId)
+    .eq("event_id", id)
     .single();
 
+  console.log("Speaker query:", { speakerId, id, speaker, speakerError });
+
   if (!speaker) {
-    redirect(`/events/${params.id}`);
+    console.log("Speaker not found, redirecting...");
+    redirect(`/events/${id}`);
   }
 
   return (
@@ -121,9 +126,11 @@ export default async function SpeakerDetailPage({
           <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          <Button className="w-full md:w-auto" variant="outline" disabled>
-            Generate Speaker Announcement
-          </Button>
+          <GenerateAnnouncementButton
+            speaker={speaker}
+            event={event}
+            className="w-full md:w-auto"
+          />
         </CardContent>
       </Card>
     </div>

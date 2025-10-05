@@ -11,8 +11,9 @@ export const dynamic = "force-dynamic";
 export default async function NewSpeakerPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const supabase = createServerComponentClient<Database>({ cookies });
 
   const {
@@ -26,7 +27,7 @@ export default async function NewSpeakerPage({
   const { data: event } = await supabase
     .from("events")
     .select("*")
-    .eq("id", params.id)
+    .eq("id", id)
     .eq("user_id", user.id)
     .single();
 

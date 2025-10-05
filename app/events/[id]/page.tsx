@@ -12,14 +12,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { GenerateAnnouncementButton } from "@/components/events/GenerateAnnouncementButton";
 
 export const dynamic = "force-dynamic";
 
 export default async function EventDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const supabase = createServerComponentClient<Database>({ cookies });
 
   const {
@@ -33,7 +35,7 @@ export default async function EventDetailPage({
   const { data: event } = await supabase
     .from("events")
     .select("*")
-    .eq("id", params.id)
+    .eq("id", id)
     .eq("user_id", user.id)
     .single();
 
@@ -44,7 +46,7 @@ export default async function EventDetailPage({
   const { data: speakers } = await supabase
     .from("speakers")
     .select("*")
-    .eq("event_id", params.id)
+    .eq("event_id", id)
     .order("created_at", { ascending: true });
 
   return (
@@ -169,10 +171,17 @@ export default async function EventDetailPage({
                       {speaker.session_description}
                     </div>
                   )}
-                  <div className="pt-2">
-                    <Link href={`/events/${event.id}/speakers/${speaker.id}`}>
-                      <Button size="sm" variant="outline">
-                        View Details
+                  <div className="flex gap-2 pt-4 border-t mt-4">
+                    <GenerateAnnouncementButton
+                      speaker={speaker}
+                      event={event}
+                      variant="default"
+                      size="sm"
+                      className="flex-1"
+                    />
+                    <Link href={`/events/${event.id}/speakers/${speaker.id}`} className="flex-1">
+                      <Button size="sm" variant="outline" className="w-full">
+                        Details
                       </Button>
                     </Link>
                   </div>

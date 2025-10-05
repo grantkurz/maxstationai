@@ -11,8 +11,9 @@ export const dynamic = "force-dynamic";
 export default async function EditSpeakerPage({
   params,
 }: {
-  params: { id: string; speakerId: string };
+  params: Promise<{ id: string; speakerId: string }>;
 }) {
+  const { id, speakerId } = await params;
   const supabase = createServerComponentClient<Database>({ cookies });
 
   const {
@@ -26,7 +27,7 @@ export default async function EditSpeakerPage({
   const { data: event } = await supabase
     .from("events")
     .select("*")
-    .eq("id", params.id)
+    .eq("id", id)
     .eq("user_id", user.id)
     .single();
 
@@ -37,12 +38,12 @@ export default async function EditSpeakerPage({
   const { data: speaker } = await supabase
     .from("speakers")
     .select("*")
-    .eq("id", params.speakerId)
-    .eq("event_id", params.id)
+    .eq("id", speakerId)
+    .eq("event_id", id)
     .single();
 
   if (!speaker) {
-    redirect(`/events/${params.id}`);
+    redirect(`/events/${id}`);
   }
 
   return (
