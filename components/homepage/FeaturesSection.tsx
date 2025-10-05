@@ -3,31 +3,27 @@ import { Badge } from "@/components/ui/badge"
 
 const features = [
   {
-    title: "Multiple Styles",
-    description: "Choose from various professional styles and backgrounds",
+    title: "Automated Marketing",
+    description: "AI-powered campaigns and personalized attendee communications",
+    icon: <Star className="h-6 w-6" />
+  },
+  {
+    title: "Real-time Analytics",
+    description: "Track attendance, engagement, and event metrics in real-time",
     icon: <Camera className="h-6 w-6" />
   },
   {
-    title: "High Resolution",
-    description: "Get print-ready images in stunning 4K resolution",
-    icon: <Camera className="h-6 w-6" />
-  },
-  {
-    title: "Fast Delivery",
-    description: "Receive your photos in just 20 minutes",
+    title: "Multi-channel Promotion",
+    description: "Promote your event across email, social media, and SMS",
     icon: <Clock className="h-6 w-6" />
   },
   {
-    title: "Commercial License",
-    description: "Use your photos anywhere, including commercial purposes",
+    title: "Attendee Management",
+    description: "Manage attendees, send updates, and handle check-ins effortlessly",
     icon: <Shield className="h-6 w-6" />
   },
-  {
-    title: "AI Enhancement",
-    description: "Advanced AI technology for natural-looking results",
-    icon: <Star className="h-6 w-6" />
-  },
 ]
+
 
 export default function FeaturesSection() {
   return (
@@ -36,7 +32,7 @@ export default function FeaturesSection() {
         <div className="text-center mb-12">
           <Badge variant="outline" className="mb-4">Features</Badge>
           <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
-            Everything You Need for Perfect Headshots
+            Everything You Need for Perfect Event Marketing
           </h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

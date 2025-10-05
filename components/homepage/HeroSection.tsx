@@ -11,18 +11,18 @@ export default function HeroSection() {
       <div className="container px-4 md:px-6">
         <div className="mx-auto max-w-3xl text-center mb-8">
           <Badge className="mb-4" variant="outline">
-            THE #1 RANKED AI HEADSHOT COMPANY
+            THE #1 RANKED AI Event Marketing Platform
           </Badge>
           <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl mb-6">
-            The Leading AI Headshot Generator for <span className="text-primary">Professionals</span>
+            The Leading AI Event Marketing Platform for <span className="text-primary">Professionals</span>
           </h1>
           <p className="text-muted-foreground text-lg md:text-xl max-w-[800px] mx-auto">
-            Turn your selfies into studio-quality headshots in minutes. Save hundreds of dollars and hours of your time.
+            Turn your selfies into studio-quality event marketing in minutes. Save hundreds of dollars and hours of your time.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row justify-center gap-4">
             <Link href="/login" className="w-full sm:w-auto">
               <Button size="lg" className="group">
-                Create your headshots now
+                Create your event marketing now
                 <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Button>
             </Link>

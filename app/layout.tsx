@@ -29,7 +29,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen flex flex-col bg-background">
+      <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <AnnouncementBar />
           {/* Remove the section wrapper as it's interfering with sticky positioning */}
@@ -42,10 +42,9 @@ export default function RootLayout({
           >
             <Navbar />
           </Suspense>
-          <main className="flex-1">
+          <main>
             {children}
           </main>
-          <Footer />
           <Toaster />
           <Analytics />
         </ThemeProvider>

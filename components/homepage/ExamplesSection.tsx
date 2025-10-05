@@ -13,7 +13,7 @@ export default function ExamplesSection() {
           </Badge>
           <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">Stunning Transformations</h2>
           <p className="max-w-[700px] text-muted-foreground text-lg">
-            See how our AI transforms regular selfies into professional headshots that make you stand out.
+            See how our AI transforms regular selfies into professional event marketing that make you stand out.
           </p>
         </div>
         <div className="mt-16 grid gap-4 sm:gap-6 md:gap-8 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
