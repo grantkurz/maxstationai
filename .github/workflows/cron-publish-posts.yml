@@ -1,0 +1,29 @@
+name: Publish Scheduled Posts
+
+on:
+  # Run every 5 minutes
+  schedule:
+    - cron: '*/5 * * * *'
+
+  # Allow manual trigger for testing
+  workflow_dispatch:
+
+jobs:
+  publish-posts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger publish scheduled posts endpoint
+        run: |
+          curl -X POST "${{ secrets.APP_URL }}/api/cron/publish-scheduled-posts" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -f \
+            --retry 3 \
+            --retry-delay 5
+
+      - name: Check if request failed
+        if: failure()
+        run: |
+          echo "Failed to trigger cron job. Check your APP_URL and CRON_SECRET in GitHub Secrets."
+          exit 1

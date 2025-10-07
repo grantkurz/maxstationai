@@ -9,6 +9,64 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      announcements: {
+        Row: {
+          id: number
+          created_at: string
+          updated_at: string
+          user_id: string
+          speaker_id: number
+          event_id: number
+          announcement_text: string
+          platform: "linkedin" | "twitter" | "instagram"
+          template: "pre-event" | "day-of" | "post-event" | "custom"
+          character_count: number
+        }
+        Insert: {
+          id?: number
+          created_at?: string
+          updated_at?: string
+          user_id: string
+          speaker_id: number
+          event_id: number
+          announcement_text: string
+          platform: "linkedin" | "twitter" | "instagram"
+          template: "pre-event" | "day-of" | "post-event" | "custom"
+          character_count: number
+        }
+        Update: {
+          id?: number
+          created_at?: string
+          updated_at?: string
+          user_id?: string
+          speaker_id?: number
+          event_id?: number
+          announcement_text?: string
+          platform?: "linkedin" | "twitter" | "instagram"
+          template?: "pre-event" | "day-of" | "post-event" | "custom"
+          character_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcements_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcements_speaker_id_fkey"
+            columns: ["speaker_id"]
+            referencedRelation: "speakers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcements_event_id_fkey"
+            columns: ["event_id"]
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       credits: {
         Row: {
           created_at: string
@@ -222,6 +280,94 @@ export interface Database {
         Relationships: [
           {
             foreignKeyName: "speakers_event_id_fkey"
+            columns: ["event_id"]
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      scheduled_posts: {
+        Row: {
+          id: number
+          created_at: string
+          updated_at: string
+          user_id: string
+          announcement_id: number
+          speaker_id: number
+          event_id: number
+          scheduled_time: string
+          timezone: string
+          platform: "linkedin" | "twitter" | "instagram"
+          status: "pending" | "posted" | "failed" | "cancelled"
+          post_text: string
+          image_url: string | null
+          posted_at: string | null
+          posted_urn: string | null
+          error_message: string | null
+          retry_count: number
+          last_retry_at: string | null
+        }
+        Insert: {
+          id?: number
+          created_at?: string
+          updated_at?: string
+          user_id: string
+          announcement_id: number
+          speaker_id: number
+          event_id: number
+          scheduled_time: string
+          timezone?: string
+          platform: "linkedin" | "twitter" | "instagram"
+          status?: "pending" | "posted" | "failed" | "cancelled"
+          post_text: string
+          image_url?: string | null
+          posted_at?: string | null
+          posted_urn?: string | null
+          error_message?: string | null
+          retry_count?: number
+          last_retry_at?: string | null
+        }
+        Update: {
+          id?: number
+          created_at?: string
+          updated_at?: string
+          user_id?: string
+          announcement_id?: number
+          speaker_id?: number
+          event_id?: number
+          scheduled_time?: string
+          timezone?: string
+          platform?: "linkedin" | "twitter" | "instagram"
+          status?: "pending" | "posted" | "failed" | "cancelled"
+          post_text?: string
+          image_url?: string | null
+          posted_at?: string | null
+          posted_urn?: string | null
+          error_message?: string | null
+          retry_count?: number
+          last_retry_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_posts_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_announcement_id_fkey"
+            columns: ["announcement_id"]
+            referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_speaker_id_fkey"
+            columns: ["speaker_id"]
+            referencedRelation: "speakers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_event_id_fkey"
             columns: ["event_id"]
             referencedRelation: "events"
             referencedColumns: ["id"]

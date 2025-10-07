@@ -6,6 +6,7 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
 import { ANTHROPIC_MODELS } from "@/constants";
 import { speakerAnnouncementPrompt } from "@/app/prompts/announcements/speaker-announcement";
+import { AnnouncementService } from "@/lib/services/announcement-service";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ interface GenerateAnnouncementRequest {
   event: EventType;
   platform?: "linkedin" | "twitter" | "instagram";
   template?: "pre-event" | "day-of" | "post-event" | "custom";
+  save?: boolean; // Optional flag to save the announcement
 }
 
 /**
@@ -46,12 +48,26 @@ export async function POST(req: NextRequest) {
 
   try {
     const body: GenerateAnnouncementRequest = await req.json();
-    const { speaker, event, platform = "linkedin", template = "pre-event" } = body;
+    const {
+      speaker,
+      event,
+      platform = "linkedin",
+      template = "pre-event",
+      save = false,
+    } = body;
 
     // Validate required fields
     if (!speaker?.name || !speaker?.session_title || !event?.title) {
       return NextResponse.json(
         { error: "Missing required speaker or event information" },
+        { status: 400 }
+      );
+    }
+
+    // Validate speaker belongs to event
+    if (speaker.event_id !== event.id) {
+      return NextResponse.json(
+        { error: "Speaker does not belong to the specified event" },
         { status: 400 }
       );
     }
@@ -68,7 +84,6 @@ export async function POST(req: NextRequest) {
           content: prompt,
         },
       ],
-      maxTokens: 2048,
     });
 
     if (!text || text.trim().length === 0) {
@@ -78,11 +93,53 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const announcementText = text.trim();
+    const characterCount = announcementText.length;
+
+    // Optionally save to database
+    let savedAnnouncement = null;
+    if (save) {
+      try {
+        const announcementService = new AnnouncementService(supabase);
+
+        savedAnnouncement = await announcementService.createAnnouncement({
+          speakerId: speaker.id,
+          eventId: event.id,
+          announcementText,
+          platform,
+          template,
+          userId: user.id,
+        });
+      } catch (saveError) {
+        console.error("Error saving announcement:", saveError);
+        // Return the generated announcement even if save fails
+        // Include error in response so client knows save failed
+        return NextResponse.json({
+          announcement: announcementText,
+          platform,
+          template,
+          characterCount,
+          saved: false,
+          saveError:
+            saveError instanceof Error
+              ? saveError.message
+              : "Failed to save announcement",
+        });
+      }
+    }
+
     return NextResponse.json({
-      announcement: text.trim(),
+      announcement: announcementText,
       platform,
       template,
-      characterCount: text.trim().length,
+      characterCount,
+      saved: save,
+      savedAnnouncement: savedAnnouncement
+        ? {
+            id: savedAnnouncement.id,
+            createdAt: savedAnnouncement.created_at,
+          }
+        : null,
     });
   } catch (error) {
     console.error("Error generating announcement:", error);
