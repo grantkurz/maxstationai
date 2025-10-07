@@ -1,4 +1,3 @@
-
 import { Database } from "@/types/supabase";
 
 type EventType = Database["public"]["Tables"]["events"]["Row"];

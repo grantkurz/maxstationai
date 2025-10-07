@@ -12,7 +12,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { GenerateAnnouncementButton } from "@/components/events/GenerateAnnouncementButton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SpeakerCardWithActions } from "@/components/events/SpeakerCardWithActions";
+import { ScheduledPostsList } from "@/components/events/ScheduledPostsList";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +50,19 @@ export default async function EventDetailPage({
     .select("*")
     .eq("event_id", id)
     .order("created_at", { ascending: true });
+
+  // Fetch scheduled posts with speaker information
+  const { data: scheduledPosts } = await supabase
+    .from("scheduled_posts")
+    .select("*, speaker:speakers(*)")
+    .eq("event_id", id)
+    .order("scheduled_time", { ascending: true });
+
+  // Type guard for scheduled posts with speaker
+  const scheduledPostsWithSpeaker = scheduledPosts?.filter(
+    (post): post is typeof post & { speaker: NonNullable<typeof post.speaker> } =>
+      post.speaker !== null
+  ) || [];
 
   return (
     <div className="container mx-auto py-10">
@@ -121,76 +136,74 @@ export default async function EventDetailPage({
 
       <Separator className="my-8" />
 
-      <div>
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h2 className="text-2xl font-bold">Speakers</h2>
-            <p className="text-muted-foreground mt-1">
-              {speakers?.length || 0} speaker(s) for this event
-            </p>
-          </div>
-          <Link href={`/events/${event.id}/speakers/new`}>
-            <Button>Add Speaker</Button>
-          </Link>
-        </div>
+      {/* Tabs for Speakers and Scheduled Posts */}
+      <Tabs defaultValue="speakers" className="space-y-6">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="speakers">
+            Speakers ({speakers?.length || 0})
+          </TabsTrigger>
+          <TabsTrigger value="scheduled">
+            Scheduled Posts ({scheduledPostsWithSpeaker.length})
+          </TabsTrigger>
+        </TabsList>
 
-        {!speakers || speakers.length === 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>No speakers yet</CardTitle>
-              <CardDescription>
-                Add speakers to this event to get started.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href={`/events/${event.id}/speakers/new`}>
-                <Button>Add First Speaker</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {speakers.map((speaker) => (
-              <Card key={speaker.id}>
-                <CardHeader>
-                  <CardTitle>{speaker.name}</CardTitle>
-                  <CardDescription>{speaker.speaker_title}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div>
-                    <span className="font-medium">Session:</span>{" "}
-                    {speaker.session_title}
-                  </div>
-                  {speaker.speaker_bio && (
-                    <div className="text-sm text-muted-foreground line-clamp-2">
-                      {speaker.speaker_bio}
-                    </div>
-                  )}
-                  {speaker.session_description && (
-                    <div className="text-sm text-muted-foreground line-clamp-2">
-                      {speaker.session_description}
-                    </div>
-                  )}
-                  <div className="flex gap-2 pt-4 border-t mt-4">
-                    <GenerateAnnouncementButton
-                      speaker={speaker}
-                      event={event}
-                      variant="default"
-                      size="sm"
-                      className="flex-1"
-                    />
-                    <Link href={`/events/${event.id}/speakers/${speaker.id}`} className="flex-1">
-                      <Button size="sm" variant="outline" className="w-full">
-                        Details
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+        {/* Speakers Tab */}
+        <TabsContent value="speakers" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold">Speakers</h2>
+              <p className="text-muted-foreground mt-1">
+                {speakers?.length || 0} speaker(s) for this event
+              </p>
+            </div>
+            <Link href={`/events/${event.id}/speakers/new`}>
+              <Button>Add Speaker</Button>
+            </Link>
           </div>
-        )}
-      </div>
+
+          {!speakers || speakers.length === 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>No speakers yet</CardTitle>
+                <CardDescription>
+                  Add speakers to this event to get started.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href={`/events/${event.id}/speakers/new`}>
+                  <Button>Add First Speaker</Button>
+                </Link>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {speakers.map((speaker) => (
+                <SpeakerCardWithActions
+                  key={speaker.id}
+                  speaker={speaker}
+                  event={event}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Scheduled Posts Tab */}
+        <TabsContent value="scheduled" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold">Scheduled Posts</h2>
+              <p className="text-muted-foreground mt-1">
+                Manage all scheduled social media posts for this event
+              </p>
+            </div>
+          </div>
+
+          <ScheduledPostsList
+            scheduledPosts={scheduledPostsWithSpeaker}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
