@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateObject } from "ai";
 import { z } from "zod";
+import { ANTHROPIC_MODELS } from "@/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest) {
 
     // Parse text into structured speaker data using Claude AI
     const { object } = await generateObject({
-      model: anthropic("claude-3-5-sonnet-20241022"),
+      model: anthropic(ANTHROPIC_MODELS["claude-sonnet-4.5"]),
       schema: SpeakerSchema,
       messages: [
         {

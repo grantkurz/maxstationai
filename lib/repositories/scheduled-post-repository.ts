@@ -166,7 +166,7 @@ export class ScheduledPostRepository {
     let query = this.supabase
       .from("scheduled_posts")
       .select("*")
-      .eq("status", "pending")
+      .or(`status.eq.pending,and(status.eq.failed,retry_count.lt.3)`)
       .lte("scheduled_time", cutoffTime)
       .order("scheduled_time", { ascending: true });
 

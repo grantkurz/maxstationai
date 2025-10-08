@@ -74,22 +74,30 @@ export async function POST(req: NextRequest) {
 
         // Currently only LinkedIn is supported
         if (post.platform === "linkedin") {
-          // Get user's LinkedIn access token
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("linkedin_access_token")
-            .eq("id", post.user_id)
-            .single();
+          // LinkedInService reads tokens from environment variables automatically
+          let assetUrn: string | undefined;
 
-          if (!profile?.linkedin_access_token) {
-            throw new Error("LinkedIn access token not found for user");
+          // If post has an image, we need to upload it first
+          if (post.image_url) {
+            // Fetch the image from storage
+            const imageResponse = await fetch(post.image_url);
+            if (!imageResponse.ok) {
+              throw new Error(`Failed to fetch image from storage: ${imageResponse.statusText}`);
+            }
+
+            const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+            const filename = post.image_url.split('/').pop() || 'image.jpg';
+
+            // Register and upload image to LinkedIn
+            const [uploadUrl, registeredAssetUrn] = await linkedInService.registerImageUpload();
+            assetUrn = registeredAssetUrn;
+            await linkedInService.uploadBinary(uploadUrl, imageBuffer, filename);
           }
 
-          // Publish to LinkedIn
+          // Create LinkedIn post
           const postUrn = await linkedInService.createPost(
-            post.user_id,
             post.post_text,
-            post.image_url || undefined
+            assetUrn
           );
 
           // Mark as posted
