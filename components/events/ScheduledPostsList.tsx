@@ -293,15 +293,9 @@ export function ScheduledPostsList({
                           <Button
                             variant="ghost"
                             size="sm"
-                            asChild
+                            onClick={() => window.open(`https://www.linkedin.com/feed/update/${post.posted_urn}`, '_blank', 'noopener,noreferrer')}
                           >
-                            <a
-                              href={`https://www.linkedin.com/feed/update/${post.posted_urn}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
+                            <ExternalLink className="h-4 w-4" />
                           </Button>
                         )}
 
