@@ -6,372 +6,296 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export interface Database {
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "13.0.5"
+  }
   public: {
     Tables: {
       announcements: {
         Row: {
-          id: number
+          announcement_text: string
+          character_count: number
           created_at: string
+          event_id: number
+          id: number
+          platform: string
+          speaker_id: number
+          template: string
           updated_at: string
           user_id: string
-          speaker_id: number
-          event_id: number
-          announcement_text: string
-          platform: "linkedin" | "twitter" | "instagram"
-          template: "pre-event" | "day-of" | "post-event" | "custom"
-          character_count: number
         }
         Insert: {
-          id?: number
+          announcement_text: string
+          character_count: number
           created_at?: string
+          event_id: number
+          id?: number
+          platform: string
+          speaker_id: number
+          template: string
           updated_at?: string
           user_id: string
-          speaker_id: number
-          event_id: number
-          announcement_text: string
-          platform: "linkedin" | "twitter" | "instagram"
-          template: "pre-event" | "day-of" | "post-event" | "custom"
-          character_count: number
         }
         Update: {
-          id?: number
+          announcement_text?: string
+          character_count?: number
           created_at?: string
+          event_id?: number
+          id?: number
+          platform?: string
+          speaker_id?: number
+          template?: string
           updated_at?: string
           user_id?: string
-          speaker_id?: number
-          event_id?: number
-          announcement_text?: string
-          platform?: "linkedin" | "twitter" | "instagram"
-          template?: "pre-event" | "day-of" | "post-event" | "custom"
-          character_count?: number
         }
         Relationships: [
           {
-            foreignKeyName: "announcements_user_id_fkey"
-            columns: ["user_id"]
-            referencedRelation: "users"
+            foreignKeyName: "announcements_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "announcements_speaker_id_fkey"
             columns: ["speaker_id"]
+            isOneToOne: false
             referencedRelation: "speakers"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "announcements_event_id_fkey"
-            columns: ["event_id"]
-            referencedRelation: "events"
-            referencedColumns: ["id"]
-          }
         ]
       }
-      credits: {
+      event_agendas: {
         Row: {
+          agenda_format: string
+          agenda_text: string
           created_at: string
-          credits: number
+          event_id: number
           id: number
+          included_speaker_ids: number[]
+          is_published: boolean
+          published_at: string | null
+          updated_at: string
           user_id: string
+          version: number
         }
         Insert: {
+          agenda_format?: string
+          agenda_text: string
           created_at?: string
-          credits?: number
+          event_id: number
           id?: number
+          included_speaker_ids?: number[]
+          is_published?: boolean
+          published_at?: string | null
+          updated_at?: string
           user_id: string
+          version?: number
         }
         Update: {
+          agenda_format?: string
+          agenda_text?: string
           created_at?: string
-          credits?: number
+          event_id?: number
           id?: number
+          included_speaker_ids?: number[]
+          is_published?: boolean
+          published_at?: string | null
+          updated_at?: string
           user_id?: string
+          version?: number
         }
         Relationships: [
           {
-            foreignKeyName: "credits_user_id_fkey"
-            columns: ["user_id"]
-            referencedRelation: "users"
+            foreignKeyName: "event_agendas_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       events: {
         Row: {
-          id: number
           created_at: string
+          date: string
+          description: string | null
+          end_time: string
+          event_page_url: string | null
+          id: number
+          location: string
+          start_time: string
+          ticket_url: string | null
+          timezone: string
+          title: string
+          type: string
           updated_at: string
           user_id: string
-          title: string
-          date: string
-          location: string
-          start_time: string
-          end_time: string
-          description: string | null
-          timezone: string
-          type: string
-          ticket_url: string | null
         }
         Insert: {
-          id?: number
           created_at?: string
-          updated_at?: string
-          user_id: string
-          title: string
           date: string
+          description?: string | null
+          end_time: string
+          event_page_url?: string | null
+          id?: number
           location: string
           start_time: string
-          end_time: string
-          description?: string | null
-          timezone?: string
-          type?: string
           ticket_url?: string | null
+          timezone?: string
+          title: string
+          type?: string
+          updated_at?: string
+          user_id: string
         }
         Update: {
-          id?: number
           created_at?: string
-          updated_at?: string
-          user_id?: string
-          title?: string
           date?: string
+          description?: string | null
+          end_time?: string
+          event_page_url?: string | null
+          id?: number
           location?: string
           start_time?: string
-          end_time?: string
-          description?: string | null
-          timezone?: string
-          type?: string
           ticket_url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "events_user_id_fkey"
-            columns: ["user_id"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      images: {
-        Row: {
-          created_at: string
-          id: number
-          modelId: number
-          uri: string
-        }
-        Insert: {
-          created_at?: string
-          id?: number
-          modelId: number
-          uri: string
-        }
-        Update: {
-          created_at?: string
-          id?: number
-          modelId?: number
-          uri?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "images_modelId_fkey"
-            columns: ["modelId"]
-            referencedRelation: "models"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      models: {
-        Row: {
-          created_at: string
-          id: number
-          modelId: string | null
-          name: string | null
-          status: string
-          type: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          id?: number
-          modelId?: string | null
-          name?: string | null
-          status?: string
-          type?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          id?: number
-          modelId?: string | null
-          name?: string | null
-          status?: string
-          type?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "models_user_id_fkey"
-            columns: ["user_id"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      samples: {
-        Row: {
-          created_at: string
-          id: number
-          modelId: number
-          uri: string
-        }
-        Insert: {
-          created_at?: string
-          id?: number
-          modelId: number
-          uri: string
-        }
-        Update: {
-          created_at?: string
-          id?: number
-          modelId?: number
-          uri?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "samples_modelId_fkey"
-            columns: ["modelId"]
-            referencedRelation: "models"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      speakers: {
-        Row: {
-          id: number
-          created_at: string
-          updated_at: string
-          event_id: number
-          name: string
-          speaker_title: string
-          speaker_bio: string | null
-          session_title: string
-          session_description: string | null
-        }
-        Insert: {
-          id?: number
-          created_at?: string
+          timezone?: string
+          title?: string
+          type?: string
           updated_at?: string
-          event_id: number
-          name: string
-          speaker_title: string
-          speaker_bio?: string | null
-          session_title: string
-          session_description?: string | null
+          user_id?: string
         }
-        Update: {
-          id?: number
-          created_at?: string
-          updated_at?: string
-          event_id?: number
-          name?: string
-          speaker_title?: string
-          speaker_bio?: string | null
-          session_title?: string
-          session_description?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "speakers_event_id_fkey"
-            columns: ["event_id"]
-            referencedRelation: "events"
-            referencedColumns: ["id"]
-          }
-        ]
+        Relationships: []
       }
       scheduled_posts: {
         Row: {
-          id: number
-          created_at: string
-          updated_at: string
-          user_id: string
           announcement_id: number
-          speaker_id: number
+          created_at: string
+          error_message: string | null
           event_id: number
-          scheduled_time: string
-          timezone: string
-          platform: "linkedin" | "twitter" | "instagram"
-          status: "pending" | "posted" | "failed" | "cancelled"
-          post_text: string
+          id: number
           image_url: string | null
+          last_retry_at: string | null
+          platform: string
+          post_text: string
           posted_at: string | null
           posted_urn: string | null
-          error_message: string | null
           retry_count: number
-          last_retry_at: string | null
+          scheduled_time: string
+          speaker_id: number
+          status: string
+          timezone: string
+          updated_at: string
+          user_id: string
         }
         Insert: {
-          id?: number
+          announcement_id: number
           created_at?: string
+          error_message?: string | null
+          event_id: number
+          id?: number
+          image_url?: string | null
+          last_retry_at?: string | null
+          platform: string
+          post_text: string
+          posted_at?: string | null
+          posted_urn?: string | null
+          retry_count?: number
+          scheduled_time: string
+          speaker_id: number
+          status?: string
+          timezone?: string
           updated_at?: string
           user_id: string
-          announcement_id: number
-          speaker_id: number
-          event_id: number
-          scheduled_time: string
-          timezone?: string
-          platform: "linkedin" | "twitter" | "instagram"
-          status?: "pending" | "posted" | "failed" | "cancelled"
-          post_text: string
-          image_url?: string | null
-          posted_at?: string | null
-          posted_urn?: string | null
-          error_message?: string | null
-          retry_count?: number
-          last_retry_at?: string | null
         }
         Update: {
-          id?: number
-          created_at?: string
-          updated_at?: string
-          user_id?: string
           announcement_id?: number
-          speaker_id?: number
+          created_at?: string
+          error_message?: string | null
           event_id?: number
-          scheduled_time?: string
-          timezone?: string
-          platform?: "linkedin" | "twitter" | "instagram"
-          status?: "pending" | "posted" | "failed" | "cancelled"
-          post_text?: string
+          id?: number
           image_url?: string | null
+          last_retry_at?: string | null
+          platform?: string
+          post_text?: string
           posted_at?: string | null
           posted_urn?: string | null
-          error_message?: string | null
           retry_count?: number
-          last_retry_at?: string | null
+          scheduled_time?: string
+          speaker_id?: number
+          status?: string
+          timezone?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "scheduled_posts_user_id_fkey"
-            columns: ["user_id"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "scheduled_posts_announcement_id_fkey"
             columns: ["announcement_id"]
+            isOneToOne: false
             referencedRelation: "announcements"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "scheduled_posts_speaker_id_fkey"
-            columns: ["speaker_id"]
-            referencedRelation: "speakers"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "scheduled_posts_event_id_fkey"
             columns: ["event_id"]
+            isOneToOne: false
             referencedRelation: "events"
             referencedColumns: ["id"]
-          }
+          },
+          {
+            foreignKeyName: "scheduled_posts_speaker_id_fkey"
+            columns: ["speaker_id"]
+            isOneToOne: false
+            referencedRelation: "speakers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      speakers: {
+        Row: {
+          created_at: string
+          event_id: number
+          id: number
+          name: string
+          session_description: string | null
+          session_title: string
+          speaker_bio: string | null
+          speaker_title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: number
+          id?: number
+          name: string
+          session_description?: string | null
+          session_title: string
+          speaker_bio?: string | null
+          speaker_title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: number
+          id?: number
+          name?: string
+          session_description?: string | null
+          session_title?: string
+          speaker_bio?: string | null
+          speaker_title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "speakers_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -389,3 +313,126 @@ export interface Database {
     }
   }
 }
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const

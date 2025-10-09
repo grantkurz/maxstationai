@@ -15,6 +15,9 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SpeakerCardWithActions } from "@/components/events/SpeakerCardWithActions";
 import { ScheduledPostsList } from "@/components/events/ScheduledPostsList";
+import { GenerateAgendaDialog } from "@/components/events/agenda/GenerateAgendaDialog";
+import { EventPageUrlInput } from "@/components/events/agenda/EventPageUrlInput";
+import { AgendaViewer } from "@/components/events/agenda/AgendaViewer";
 
 export const dynamic = "force-dynamic";
 
@@ -124,14 +127,30 @@ export default async function EventDetailPage({
                 Add Speaker
               </Button>
             </Link>
-            <Button className="w-full" variant="outline" disabled>
-              Generate Announcement
-            </Button>
-            <Button className="w-full" variant="outline" disabled>
-              Create Luma Agenda
-            </Button>
+            <GenerateAgendaDialog event={event} />
           </CardContent>
         </Card>
+      </div>
+
+      <Separator className="my-8" />
+
+      {/* Event Page URL and Agenda Section */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Event Page</CardTitle>
+            <CardDescription>
+              Add your Luma or event platform link to include in announcements
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <EventPageUrlInput event={event} />
+          </CardContent>
+        </Card>
+
+        <div className="md:col-span-2">
+          <AgendaViewer event={event} />
+        </div>
       </div>
 
       <Separator className="my-8" />
