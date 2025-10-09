@@ -18,6 +18,7 @@ import { ScheduledPostsList } from "@/components/events/ScheduledPostsList";
 import { GenerateAgendaDialog } from "@/components/events/agenda/GenerateAgendaDialog";
 import { EventPageUrlInput } from "@/components/events/agenda/EventPageUrlInput";
 import { AgendaViewer } from "@/components/events/agenda/AgendaViewer";
+import { DripCampaignDialog } from "@/components/events/DripCampaignDialog";
 
 export const dynamic = "force-dynamic";
 
@@ -128,6 +129,10 @@ export default async function EventDetailPage({
               </Button>
             </Link>
             <GenerateAgendaDialog event={event} />
+            <DripCampaignDialog
+              event={event}
+              speakerCount={speakers?.length || 0}
+            />
           </CardContent>
         </Card>
       </div>
