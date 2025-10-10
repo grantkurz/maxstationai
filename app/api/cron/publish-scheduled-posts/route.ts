@@ -75,22 +75,26 @@ export async function POST(req: NextRequest) {
         console.log(`[Cron] Publishing post ${post.id} (${post.platform})`);
 
         if (post.platform === "linkedin") {
-          // Get user's LinkedIn access token
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("linkedin_access_token")
-            .eq("id", post.user_id)
-            .single();
+          // Handle image download if URL provided
+          let imageBuffer: Buffer | undefined;
+          let filename: string | undefined;
 
-          if (!profile?.linkedin_access_token) {
-            throw new Error("LinkedIn access token not found for user");
+          if (post.image_url) {
+            console.log(`[Cron] Downloading image from ${post.image_url}`);
+            // Download image from Supabase Storage URL
+            const response = await fetch(post.image_url);
+            if (response.ok) {
+              const arrayBuffer = await response.arrayBuffer();
+              imageBuffer = Buffer.from(arrayBuffer);
+              filename = post.image_url.split("/").pop() || "image.jpg";
+            }
           }
 
-          // Publish to LinkedIn
-          const postUrn = await linkedInService.createPost(
-            post.user_id,
+          // Publish to LinkedIn using env credentials
+          const postUrn = await linkedInService.postToLinkedIn(
             post.post_text,
-            post.image_url || undefined
+            imageBuffer,
+            filename
           );
 
           // Mark as posted

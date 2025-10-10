@@ -186,7 +186,7 @@ export class AnnouncementService {
       let platform = updates.platform;
       if (!platform) {
         const currentAnnouncement = await this.repository.getAnnouncementById(id);
-        platform = currentAnnouncement!.platform;
+        platform = currentAnnouncement!.platform as "linkedin" | "twitter" | "instagram";
       }
 
       this.validateCharacterCountForPlatform(platform, characterCount);

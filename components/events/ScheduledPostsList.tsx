@@ -296,7 +296,10 @@ export function ScheduledPostsList({
                     <TableCell>
                       <Badge
                         variant="secondary"
-                        className={statusColors[post.status]}
+                        className={
+                          statusColors[post.status as keyof typeof statusColors] ||
+                          "bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-300"
+                        }
                       >
                         {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
                       </Badge>

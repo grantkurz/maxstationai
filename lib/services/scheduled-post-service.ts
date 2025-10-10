@@ -58,7 +58,7 @@ export class ScheduledPostService {
     // Check for duplicate scheduling
     const hasDuplicate = await this.repository.hasDuplicateSchedule(
       params.announcementId,
-      announcement.platform,
+      announcement.platform as "linkedin" | "twitter" | "instagram",
       params.scheduledTime
     );
 

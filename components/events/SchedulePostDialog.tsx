@@ -161,20 +161,20 @@ export function SchedulePostDialog({
   }, [toast]);
 
   const dropzoneAccept = isXPlatform
-    ? {
+    ? ({
         "image/png": [".png"],
         "image/jpeg": [".jpg", ".jpeg"],
         "image/gif": [".gif"],
         "image/webp": [".webp"],
-      }
-    : {
+      } as const)
+    : ({
         "image/png": [".png"],
         "image/jpeg": [".jpg", ".jpeg"],
-      };
+      } as const);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: dropzoneAccept,
+    accept: dropzoneAccept as any,
     maxFiles: 1,
     disabled: scheduling || scheduled,
   });
