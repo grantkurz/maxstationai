@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { ScheduledPostService } from "@/lib/services/scheduled-post-service";
 import { LinkedInService } from "@/lib/services/linkedin-service";
+import { InstagramService } from "@/lib/services/instagram-service";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const scheduledPostService = new ScheduledPostService(supabase);
-    const linkedInService = new LinkedInService(supabase);
+    const linkedInService = new LinkedInService();
+    const instagramService = new InstagramService();
 
     // Get all pending posts that are ready to publish
     const pendingPosts = await scheduledPostService.getPendingScheduledPosts();
@@ -72,30 +74,50 @@ export async function POST(req: NextRequest) {
       try {
         console.log(`[Cron] Publishing post ${post.id} (${post.platform})`);
 
-        // Currently only LinkedIn is supported
         if (post.platform === "linkedin") {
-          // Get user's LinkedIn access token
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("linkedin_access_token")
-            .eq("id", post.user_id)
-            .single();
+          // Fetch image if URL is provided
+          let imageBuffer: Buffer | undefined;
+          let filename: string | undefined;
 
-          if (!profile?.linkedin_access_token) {
-            throw new Error("LinkedIn access token not found for user");
+          if (post.image_url) {
+            const imageResponse = await fetch(post.image_url);
+            if (!imageResponse.ok) {
+              throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
+            }
+            const arrayBuffer = await imageResponse.arrayBuffer();
+            imageBuffer = Buffer.from(arrayBuffer);
+            filename = post.image_url.split('/').pop() || 'image.jpg';
           }
 
           // Publish to LinkedIn
-          const postUrn = await linkedInService.createPost(
-            post.user_id,
+          const postUrn = await linkedInService.postToLinkedIn(
             post.post_text,
-            post.image_url || undefined
+            imageBuffer,
+            filename
           );
 
           // Mark as posted
           await scheduledPostService.markAsPosted(post.id, postUrn);
 
           console.log(`[Cron] Successfully published post ${post.id}: ${postUrn}`);
+          results.published++;
+        } else if (post.platform === "instagram") {
+          // Validate Instagram requires image URL
+          if (!post.image_url) {
+            throw new Error("Instagram posts require an image URL");
+          }
+
+          // Publish to Instagram
+          const result = await instagramService.postToInstagram(
+            post.image_url,
+            post.post_text
+          );
+          const mediaId = result.mediaId;
+
+          // Mark as posted
+          await scheduledPostService.markAsPosted(post.id, mediaId);
+
+          console.log(`[Cron] Successfully published post ${post.id}: ${mediaId}`);
           results.published++;
         } else {
           throw new Error(`Platform ${post.platform} is not yet supported`);

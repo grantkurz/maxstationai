@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { GenerateAnnouncementButton } from "./GenerateAnnouncementButton";
-import { PostToLinkedInDialog } from "./PostToLinkedInDialog";
+import { PostDialog } from "./PostDialog";
 import { SchedulePostDialog } from "./SchedulePostDialog";
 import { Send, Calendar, Loader2 } from "lucide-react";
 import { Database } from "@/types/supabase";
@@ -37,6 +37,7 @@ export function SpeakerCardWithActions({
   const [loading, setLoading] = useState(false);
   const [postDialogOpen, setPostDialogOpen] = useState(false);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [primaryImageUrl, setPrimaryImageUrl] = useState<string | null>(null);
 
   // Fetch announcement for this speaker
   const fetchAnnouncement = async () => {
@@ -77,8 +78,26 @@ export function SpeakerCardWithActions({
     }
   };
 
+  // Fetch primary image for the speaker
+  const fetchPrimaryImage = async () => {
+    try {
+      const response = await fetch(`/api/speakers/${speaker.id}/images`);
+      const data = await response.json();
+
+      if (response.ok && data.images?.length > 0) {
+        const primary = data.images.find((img: any) => img.is_primary);
+        if (primary) {
+          setPrimaryImageUrl(primary.public_url);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch primary image:", error);
+    }
+  };
+
   useEffect(() => {
     fetchAnnouncement();
+    fetchPrimaryImage();
   }, [speaker.id]);
 
   const handleOpenPost = () => {
@@ -114,6 +133,17 @@ export function SpeakerCardWithActions({
     <>
       <Card>
         <CardHeader>
+          {/* Speaker Image */}
+          {primaryImageUrl && (
+            <div className="mb-4 rounded-lg overflow-hidden border bg-muted">
+              <img
+                src={primaryImageUrl}
+                alt={speaker.name}
+                className="w-full aspect-video object-cover"
+              />
+            </div>
+          )}
+
           <CardTitle>{speaker.name}</CardTitle>
           <CardDescription>{speaker.speaker_title}</CardDescription>
         </CardHeader>
@@ -192,7 +222,7 @@ export function SpeakerCardWithActions({
       {/* Dialogs */}
       {announcement && (
         <>
-          <PostToLinkedInDialog
+          <PostDialog
             open={postDialogOpen}
             onOpenChange={setPostDialogOpen}
             announcement={announcement}

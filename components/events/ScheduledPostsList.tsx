@@ -289,11 +289,21 @@ export function ScheduledPostsList({
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {post.status === "posted" && post.posted_urn && (
+                        {post.status === "posted" && post.posted_urn && post.platform === "linkedin" && (
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => window.open(`https://www.linkedin.com/feed/update/${post.posted_urn}`, '_blank', 'noopener,noreferrer')}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        )}
+
+                        {post.status === "posted" && post.posted_urn && post.platform === "instagram" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(`https://www.instagram.com/p/${post.posted_urn}`, '_blank', 'noopener,noreferrer')}
                           >
                             <ExternalLink className="h-4 w-4" />
                           </Button>
