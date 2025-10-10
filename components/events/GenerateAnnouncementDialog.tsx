@@ -47,7 +47,7 @@ interface GenerateAnnouncementDialogProps {
 // Platform character limits
 const PLATFORM_LIMITS = {
   linkedin: 3000,
-  twitter: 280,
+  twitter: 25000, // X Premium allows up to 25,000 characters
   instagram: 2200,
 } as const;
 

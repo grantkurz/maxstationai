@@ -186,7 +186,7 @@ export class AnnouncementService {
       let platform = updates.platform;
       if (!platform) {
         const currentAnnouncement = await this.repository.getAnnouncementById(id);
-        platform = currentAnnouncement!.platform;
+        platform = currentAnnouncement!.platform as "linkedin" | "twitter" | "instagram";
       }
 
       this.validateCharacterCountForPlatform(platform, characterCount);
@@ -345,7 +345,7 @@ export class AnnouncementService {
     characterCount: number
   ): void {
     const platformLimits = {
-      twitter: 280,
+      twitter: 25000, // X Premium allows up to 25,000 characters
       instagram: 2200,
       linkedin: 3000,
     };

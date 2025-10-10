@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { ScheduledPostService } from "@/lib/services/scheduled-post-service";
 import { LinkedInService } from "@/lib/services/linkedin-service";
+import { XService } from "@/lib/services/x-service";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const scheduledPostService = new ScheduledPostService(supabase);
-    const linkedInService = new LinkedInService(supabase);
+    const linkedInService = new LinkedInService();
+    const xService = new XService();
 
     // Get all pending posts that are ready to publish
     const pendingPosts = await scheduledPostService.getPendingScheduledPosts();
@@ -72,30 +74,56 @@ export async function POST(req: NextRequest) {
       try {
         console.log(`[Cron] Publishing post ${post.id} (${post.platform})`);
 
-        // Currently only LinkedIn is supported
         if (post.platform === "linkedin") {
-          // Get user's LinkedIn access token
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("linkedin_access_token")
-            .eq("id", post.user_id)
-            .single();
+          // Handle image download if URL provided
+          let imageBuffer: Buffer | undefined;
+          let filename: string | undefined;
 
-          if (!profile?.linkedin_access_token) {
-            throw new Error("LinkedIn access token not found for user");
+          if (post.image_url) {
+            console.log(`[Cron] Downloading image from ${post.image_url}`);
+            // Download image from Supabase Storage URL
+            const response = await fetch(post.image_url);
+            if (response.ok) {
+              const arrayBuffer = await response.arrayBuffer();
+              imageBuffer = Buffer.from(arrayBuffer);
+              filename = post.image_url.split("/").pop() || "image.jpg";
+            }
           }
 
-          // Publish to LinkedIn
-          const postUrn = await linkedInService.createPost(
-            post.user_id,
+          // Publish to LinkedIn using env credentials
+          const postUrn = await linkedInService.postToLinkedIn(
             post.post_text,
-            post.image_url || undefined
+            imageBuffer,
+            filename
           );
 
           // Mark as posted
           await scheduledPostService.markAsPosted(post.id, postUrn);
 
           console.log(`[Cron] Successfully published post ${post.id}: ${postUrn}`);
+          results.published++;
+        } else if (post.platform === "twitter" || post.platform === "x") {
+          // Handle image download if URL provided
+          let imageBuffer: Buffer | undefined;
+          let filename: string | undefined;
+
+          if (post.image_url) {
+            console.log(`[Cron] Downloading image from ${post.image_url}`);
+            imageBuffer = await xService.downloadImage(post.image_url);
+            filename = post.image_url.split("/").pop() || "image.jpg";
+          }
+
+          // Publish to X/Twitter
+          const tweetId = await xService.postToX(
+            post.post_text,
+            imageBuffer,
+            filename
+          );
+
+          // Mark as posted
+          await scheduledPostService.markAsPosted(post.id, tweetId);
+
+          console.log(`[Cron] Successfully published post ${post.id}: ${tweetId}`);
           results.published++;
         } else {
           throw new Error(`Platform ${post.platform} is not yet supported`);
