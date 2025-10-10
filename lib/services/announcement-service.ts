@@ -345,7 +345,7 @@ export class AnnouncementService {
     characterCount: number
   ): void {
     const platformLimits = {
-      twitter: 280,
+      twitter: 25000, // X Premium allows up to 25,000 characters
       instagram: 2200,
       linkedin: 3000,
     };

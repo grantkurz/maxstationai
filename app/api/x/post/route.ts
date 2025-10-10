@@ -2,14 +2,14 @@ import { Database } from "@/types/supabase";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { LinkedInService, LinkedInAPIError } from "@/lib/services/linkedin-service";
+import { XService, XAPIError } from "@/lib/services/x-service";
 import { AnnouncementRepository } from "@/lib/repositories/announcement-repository";
 
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/linkedin/post
- * Posts an announcement immediately to LinkedIn with optional image
+ * POST /api/x/post
+ * Posts an announcement immediately to X/Twitter with optional image
  *
  * Request body (FormData):
  * - announcement_id: number (required)
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Note: Platform validation removed to allow cross-platform posting
-    // Users can post any announcement to LinkedIn regardless of original platform
+    // Users can post any announcement to X regardless of original platform
 
     // Process image file if provided
     let imageBuffer: Buffer | undefined;
@@ -97,11 +97,11 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Validate file size (max 10MB)
-      const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+      // Validate file size (max 5MB for Twitter)
+      const maxSizeBytes = 5 * 1024 * 1024; // 5MB
       if (imageFile.size > maxSizeBytes) {
         return NextResponse.json(
-          { error: "Image file size exceeds 10MB limit" },
+          { error: "Image file size exceeds 5MB limit" },
           { status: 400 }
         );
       }
@@ -114,30 +114,30 @@ export async function POST(req: NextRequest) {
       console.log(`Processing image upload: ${filename} (${imageFile.size} bytes)`);
     }
 
-    // Initialize LinkedIn service
-    const linkedInService = new LinkedInService();
+    // Initialize X service
+    const xService = new XService();
 
-    // Post to LinkedIn
-    console.log(`Posting announcement ${announcementId} to LinkedIn...`);
-    const postUrn = await linkedInService.postToLinkedIn(
+    // Post to X/Twitter
+    console.log(`Posting announcement ${announcementId} to X/Twitter...`);
+    const tweetId = await xService.postToX(
       announcement.announcement_text,
       imageBuffer,
       filename
     );
 
-    console.log(`Successfully posted to LinkedIn. URN: ${postUrn}`);
+    console.log(`Successfully posted to X/Twitter. Tweet ID: ${tweetId}`);
 
     return NextResponse.json({
       success: true,
-      post_urn: postUrn,
-      message: "Successfully posted to LinkedIn",
+      tweet_id: tweetId,
+      message: "Successfully posted to X/Twitter",
       announcement_id: announcementId,
     });
   } catch (error) {
-    console.error("Error in LinkedIn post API:", error);
+    console.error("Error in X post API:", error);
 
-    // Handle LinkedIn-specific errors
-    if (error instanceof LinkedInAPIError) {
+    // Handle X-specific errors
+    if (error instanceof XAPIError) {
       return NextResponse.json(
         {
           error: error.message,
@@ -164,20 +164,20 @@ export async function POST(req: NextRequest) {
       if (error.message.includes("credentials not configured")) {
         return NextResponse.json(
           {
-            error: "LinkedIn integration not configured. Please contact administrator.",
+            error: "X/Twitter integration not configured. Please contact administrator.",
           },
           { status: 503 }
         );
       }
 
       return NextResponse.json(
-        { error: `Failed to post to LinkedIn: ${error.message}` },
+        { error: `Failed to post to X/Twitter: ${error.message}` },
         { status: 500 }
       );
     }
 
     return NextResponse.json(
-      { error: "Failed to post to LinkedIn" },
+      { error: "Failed to post to X/Twitter" },
       { status: 500 }
     );
   }
