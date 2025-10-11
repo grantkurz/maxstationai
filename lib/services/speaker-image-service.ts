@@ -1,7 +1,8 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { Database } from '@/types/supabase'
-import { SpeakerImageRepository, type SpeakerImage } from '@/lib/repositories/speaker-image-repository'
+import { SpeakerImageRepository } from '@/lib/repositories/speaker-image-repository'
+import { SpeakerImage } from '@/types/speaker-images'
 
 // Allowed image MIME types
 const ALLOWED_MIME_TYPES = [

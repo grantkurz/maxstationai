@@ -13,10 +13,10 @@ export interface SpeakerImage {
   filename: string
   mime_type: string
   size_bytes: number
-  is_primary: boolean
+  is_primary: boolean | null
   user_id: string
-  created_at: string
-  updated_at: string
+  created_at: string | null
+  updated_at: string | null
 }
 
 /**

@@ -95,14 +95,21 @@ export function SchedulePostDialog({
   const [primaryImageUrl, setPrimaryImageUrl] = useState<string | null>(null);
   const [loadingImage, setLoadingImage] = useState(false);
   const [scheduled, setScheduled] = useState(false);
-  const [selectedPlatform, setSelectedPlatform] = useState<"linkedin" | "instagram">(
-    announcement.platform as "linkedin" | "instagram"
+  const [selectedPlatform, setSelectedPlatform] = useState<"linkedin" | "twitter" | "instagram">(
+    announcement.platform as "linkedin" | "twitter" | "instagram"
   );
 
   // Form state
   const [selectedDate, setSelectedDate] = useState(defaultDateTime.date);
   const [selectedTime, setSelectedTime] = useState(defaultDateTime.time);
   const [selectedTimezone, setSelectedTimezone] = useState(getUserTimezone());
+
+  // Update selected platform when announcement changes (when dialog reopens with different platform)
+  useEffect(() => {
+    if (open && announcement.platform) {
+      setSelectedPlatform(announcement.platform as "linkedin" | "twitter" | "instagram");
+    }
+  }, [open, announcement.platform]);
 
   // Calculate scheduled datetime
   const getScheduledDateTime = () => {
@@ -117,9 +124,10 @@ export function SchedulePostDialog({
   const isMoreThan30Days = daysDifference > 30;
 
   // Validation: Instagram requires primary image
-  const hasRequiredImage = selectedPlatform === "linkedin"
-    ? true // LinkedIn doesn't require image
-    : !!primaryImageUrl; // Instagram requires primary image
+  const hasRequiredImage =
+    selectedPlatform === "linkedin" || selectedPlatform === "twitter"
+      ? true // LinkedIn and Twitter don't require image
+      : !!primaryImageUrl; // Instagram requires primary image
 
   const canSchedule = !isPastDate && selectedDate && selectedTime && !scheduling && !scheduled && hasRequiredImage;
 
@@ -155,8 +163,8 @@ export function SchedulePostDialog({
     }
   };
 
-  // Platform-specific constraints
-  const isXPlatform = announcement.platform === "twitter" || announcement.platform === "x";
+  // Platform-specific constraints (use selectedPlatform instead of announcement.platform)
+  const isXPlatform = selectedPlatform === "twitter";
   const maxFileSize = isXPlatform ? MAX_FILE_SIZE_X : MAX_FILE_SIZE_LINKEDIN;
   const acceptedImageTypes = isXPlatform
     ? ACCEPTED_IMAGE_TYPES_X
@@ -241,8 +249,8 @@ export function SchedulePostDialog({
       formData.append("scheduled_time", scheduledDateTime.toISOString());
       formData.append("timezone", selectedTimezone);
 
-      // For LinkedIn: upload image file or use primary image
-      if (selectedPlatform === "linkedin") {
+      // For LinkedIn and Twitter: upload image file or use primary image
+      if (selectedPlatform === "linkedin" || selectedPlatform === "twitter") {
         if (uploadedImage) {
           formData.append("image", uploadedImage);
         } else if (primaryImageUrl) {
@@ -257,43 +265,11 @@ export function SchedulePostDialog({
         formData.append("image_url", primaryImageUrl);
       }
 
-      // Determine the correct API endpoint
-      const apiEndpoint = isXPlatform ? "/api/x/schedule" : "/api/posts/schedule";
-
-      let response;
-
-      if (isXPlatform) {
-        // X API uses JSON
-        response = await fetch(apiEndpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            announcement_id: announcement.id,
-            scheduled_time: scheduledDateTime.toISOString(),
-            timezone: selectedTimezone,
-            image_url: imageUrl,
-          }),
-        });
-      } else {
-        // LinkedIn API uses FormData
-        const formData = new FormData();
-        formData.append("announcement_id", announcement.id.toString());
-        formData.append("post_text", announcement.announcement_text);
-        formData.append("platform", announcement.platform);
-        formData.append("scheduled_time", scheduledDateTime.toISOString());
-        formData.append("timezone", selectedTimezone);
-
-        if (uploadedImage) {
-          formData.append("image", uploadedImage);
-        }
-
-        response = await fetch(apiEndpoint, {
-          method: "POST",
-          body: formData,
-        });
-      }
+      // Use the unified schedule endpoint
+      const response = await fetch("/api/posts/schedule", {
+        method: "POST",
+        body: formData,
+      });
 
       const data = await response.json();
 
@@ -361,7 +337,7 @@ export function SchedulePostDialog({
       setSelectedDate(defaultDateTime.date);
       setSelectedTime(defaultDateTime.time);
       setSelectedTimezone(getUserTimezone());
-      setSelectedPlatform(announcement.platform as "linkedin" | "instagram");
+      setSelectedPlatform(announcement.platform as "linkedin" | "twitter" | "instagram");
       onOpenChange(false);
     }
   };
@@ -443,7 +419,7 @@ export function SchedulePostDialog({
                 <Label htmlFor="platform">Platform</Label>
                 <Select
                   value={selectedPlatform}
-                  onValueChange={(value) => setSelectedPlatform(value as "linkedin" | "instagram")}
+                  onValueChange={(value) => setSelectedPlatform(value as "linkedin" | "twitter" | "instagram")}
                   disabled={scheduling}
                 >
                   <SelectTrigger id="platform">
@@ -454,6 +430,12 @@ export function SchedulePostDialog({
                       <div className="flex items-center gap-2">
                         <span>💼</span>
                         <span className="font-medium">LinkedIn</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="twitter">
+                      <div className="flex items-center gap-2">
+                        <span>𝕏</span>
+                        <span className="font-medium">X (Twitter)</span>
                       </div>
                     </SelectItem>
                     <SelectItem value="instagram">
@@ -467,6 +449,8 @@ export function SchedulePostDialog({
                 <p className="text-xs text-muted-foreground">
                   {selectedPlatform === "instagram"
                     ? "Instagram requires an image"
+                    : selectedPlatform === "twitter"
+                    ? "X/Twitter supports optional images"
                     : "LinkedIn supports optional images"}
                 </p>
               </div>
@@ -565,7 +549,7 @@ export function SchedulePostDialog({
               )}
 
               {/* Image Upload/URL */}
-              {selectedPlatform === "linkedin" && (
+              {(selectedPlatform === "linkedin" || selectedPlatform === "twitter") && (
                 <div className="space-y-3">
                   <Label>Image (Optional)</Label>
 
@@ -592,7 +576,9 @@ export function SchedulePostDialog({
                             {isDragActive ? "Drop image here" : "Drag & drop image here"}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            PNG or JPEG, max 5MB
+                            {selectedPlatform === "twitter"
+                              ? "PNG, JPEG, GIF, or WebP, max 5MB"
+                              : "PNG or JPEG, max 10MB"}
                           </p>
                         </div>
                       </div>
@@ -664,15 +650,6 @@ export function SchedulePostDialog({
                             Instagram requires an image for all posts. Please upload a speaker image in the speaker profile before scheduling to Instagram.
                           </p>
                         </div>
-                      <div>
-                        <p className="text-sm font-medium">
-                          {isDragActive ? "Drop image here" : "Drag & drop image here"}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {isXPlatform
-                            ? "PNG, JPEG, GIF, or WebP • Max 5MB"
-                            : "PNG or JPEG • Max 10MB"}
-                        </p>
                       </div>
                     </div>
                   )}

@@ -103,14 +103,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate platform is Instagram
-    if (announcement.platform !== "instagram") {
-      return NextResponse.json(
-        { error: "This announcement is not configured for Instagram" },
-        { status: 400 }
-      );
-    }
-
     // Initialize Instagram service
     const instagramService = new InstagramService();
 

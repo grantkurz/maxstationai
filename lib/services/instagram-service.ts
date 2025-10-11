@@ -61,26 +61,111 @@ interface InstagramErrorResponse {
 export class InstagramService {
   private accessToken: string;
   private igUserId: string;
+  private appId: string;
+  private appSecret: string;
 
   constructor() {
     // Load credentials from environment variables
-    // Support both INSTAGRAM_ACCESS_TOKEN and FB_PAGE_ACCESS_TOKEN for flexibility
+    // Support multiple naming conventions for flexibility
     this.accessToken =
       process.env.INSTAGRAM_ACCESS_TOKEN?.trim() ||
       process.env.FB_PAGE_ACCESS_TOKEN?.trim() ||
       "";
-    this.igUserId = process.env.INSTAGRAM_USER_ID?.trim() || "";
+    this.igUserId =
+      process.env.INSTAGRAM_USER_ID?.trim() ||
+      process.env.IG_USER_ID?.trim() ||
+      "";
+    this.appId =
+      process.env.IG_APP_ID?.trim() ||
+      process.env.INSTAGRAM_APP_ID?.trim() ||
+      "";
+    this.appSecret =
+      process.env.IG_APP_SECRET?.trim() ||
+      process.env.INSTAGRAM_APP_SECRET?.trim() ||
+      "";
 
     // Validate required credentials
     if (!this.igUserId) {
       throw new Error(
-        "INSTAGRAM_USER_ID environment variable is required."
+        "IG_USER_ID (or INSTAGRAM_USER_ID) environment variable is required."
       );
     }
 
     if (!this.accessToken) {
       throw new Error(
-        "INSTAGRAM_ACCESS_TOKEN (or FB_PAGE_ACCESS_TOKEN) environment variable is required."
+        "FB_PAGE_ACCESS_TOKEN (or INSTAGRAM_ACCESS_TOKEN) environment variable is required."
+      );
+    }
+
+    if (!this.appId || !this.appSecret) {
+      console.warn(
+        "IG_APP_ID and IG_APP_SECRET not found. Token refresh will not be available."
+      );
+    }
+  }
+
+  /**
+   * Exchange a short-lived token for a long-lived token (60 days)
+   * @private
+   * @param shortLivedToken - The short-lived access token
+   * @returns Long-lived access token
+   */
+  private async exchangeForLongLivedToken(
+    shortLivedToken: string
+  ): Promise<string> {
+    if (!this.appId || !this.appSecret) {
+      throw new Error(
+        "IG_APP_ID and IG_APP_SECRET are required for token exchange"
+      );
+    }
+
+    const url = `${GRAPH_API_HOST}/${GRAPH_API_VERSION}/oauth/access_token`;
+    const params = new URLSearchParams({
+      grant_type: "fb_exchange_token",
+      client_id: this.appId,
+      client_secret: this.appSecret,
+      fb_exchange_token: shortLivedToken,
+    });
+
+    try {
+      const response = await fetch(`${url}?${params.toString()}`);
+      const data = await response.json();
+
+      if (!response.ok || !data.access_token) {
+        throw new Error(
+          `Token exchange failed: ${data.error?.message || "Unknown error"}`
+        );
+      }
+
+      console.log("Successfully exchanged for long-lived token");
+      return data.access_token;
+    } catch (error) {
+      throw new Error(
+        `Failed to exchange token: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+    }
+  }
+
+  /**
+   * Refresh the current access token
+   * Attempts to exchange the current token for a new long-lived token
+   */
+  async refreshAccessToken(): Promise<string> {
+    console.log("Attempting to refresh Instagram access token...");
+
+    try {
+      const newToken = await this.exchangeForLongLivedToken(this.accessToken);
+      this.accessToken = newToken;
+
+      console.log("Access token refreshed successfully");
+      console.warn(
+        "⚠️  Update your .env.local with the new token:\nFB_PAGE_ACCESS_TOKEN=" + newToken
+      );
+
+      return newToken;
+    } catch (error) {
+      throw new Error(
+        `Failed to refresh token: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
   }
@@ -90,12 +175,14 @@ export class InstagramService {
    * @private
    * @param path - API endpoint path (e.g., "/123456/media")
    * @param data - Request data to send
+   * @param retryOnExpired - Whether to retry with refreshed token on expiration
    * @returns Parsed JSON response
    * @throws InstagramAPIError if request fails
    */
   private async graphPost<T>(
     path: string,
-    data: Record<string, string>
+    data: Record<string, string>,
+    retryOnExpired: boolean = true
   ): Promise<T> {
     const url = `${GRAPH_API_HOST}/${GRAPH_API_VERSION}${path}`;
 
@@ -119,13 +206,44 @@ export class InstagramService {
       if (!response.ok) {
         // Try to parse error response
         let errorMessage = `Instagram API error: ${response.statusText}`;
+        let isTokenExpired = false;
+
         try {
           const errorData = JSON.parse(responseText) as InstagramErrorResponse;
           if (errorData.error) {
             errorMessage = `Instagram API error: ${errorData.error.message} (Code: ${errorData.error.code})`;
+
+            // Check if it's a token expiration error
+            // Error codes: 190 = Access token expired, 2500 = Error validating token
+            if (
+              errorData.error.code === 190 ||
+              errorData.error.code === 2500 ||
+              errorData.error.message?.toLowerCase().includes("token") ||
+              errorData.error.message?.toLowerCase().includes("expired") ||
+              errorData.error.message?.toLowerCase().includes("session")
+            ) {
+              isTokenExpired = true;
+            }
           }
         } catch {
           errorMessage = `Instagram API error: ${responseText}`;
+        }
+
+        // If token expired and we have app credentials, try to refresh and retry
+        if (isTokenExpired && retryOnExpired && this.appId && this.appSecret) {
+          console.log("Access token expired. Attempting to refresh...");
+          try {
+            await this.refreshAccessToken();
+            console.log("Token refreshed. Retrying request...");
+            // Retry once with new token (retryOnExpired = false to prevent infinite loop)
+            return await this.graphPost<T>(path, data, false);
+          } catch (refreshError) {
+            throw new InstagramAPIError(
+              `Token expired and refresh failed: ${refreshError instanceof Error ? refreshError.message : "Unknown error"}. Please update FB_PAGE_ACCESS_TOKEN in your .env.local file.`,
+              401,
+              responseText
+            );
+          }
         }
 
         throw new InstagramAPIError(

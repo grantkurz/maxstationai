@@ -1,30 +1,6 @@
 import { Database } from '@/types/supabase'
 import { SupabaseClient } from '@supabase/supabase-js'
-
-export interface SpeakerImage {
-  id: number
-  speaker_id: number
-  storage_path: string
-  public_url: string
-  filename: string
-  mime_type: string
-  size_bytes: number
-  is_primary: boolean
-  user_id: string
-  created_at: string
-  updated_at: string
-}
-
-export interface CreateSpeakerImageData {
-  speaker_id: number
-  storage_path: string
-  public_url: string
-  filename: string
-  mime_type: string
-  size_bytes: number
-  is_primary?: boolean
-  user_id: string
-}
+import { SpeakerImage, CreateSpeakerImageData } from '@/types/speaker-images'
 
 export class SpeakerImageRepository {
   constructor(private supabase: SupabaseClient<Database>) {}
