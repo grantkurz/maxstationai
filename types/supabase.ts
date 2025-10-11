@@ -124,7 +124,6 @@ export type Database = {
           date: string
           description: string | null
           end_time: string
-          event_page_url: string | null
           id: number
           location: string
           start_time: string
@@ -140,7 +139,6 @@ export type Database = {
           date: string
           description?: string | null
           end_time: string
-          event_page_url?: string | null
           id?: number
           location: string
           start_time: string
@@ -156,7 +154,6 @@ export type Database = {
           date?: string
           description?: string | null
           end_time?: string
-          event_page_url?: string | null
           id?: number
           location?: string
           start_time?: string
@@ -166,6 +163,36 @@ export type Database = {
           type?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          instagram_access_token: string | null
+          linkedin_access_token: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id: string
+          instagram_access_token?: string | null
+          linkedin_access_token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          instagram_access_token?: string | null
+          linkedin_access_token?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -254,12 +281,63 @@ export type Database = {
           },
         ]
       }
+      speaker_images: {
+        Row: {
+          created_at: string | null
+          filename: string
+          id: number
+          is_primary: boolean | null
+          mime_type: string
+          public_url: string
+          size_bytes: number
+          speaker_id: number
+          storage_path: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          filename: string
+          id?: number
+          is_primary?: boolean | null
+          mime_type: string
+          public_url: string
+          size_bytes: number
+          speaker_id: number
+          storage_path: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          filename?: string
+          id?: number
+          is_primary?: boolean | null
+          mime_type?: string
+          public_url?: string
+          size_bytes?: number
+          speaker_id?: number
+          storage_path?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "speaker_images_speaker_id_fkey"
+            columns: ["speaker_id"]
+            isOneToOne: false
+            referencedRelation: "speakers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       speakers: {
         Row: {
           created_at: string
           event_id: number
           id: number
           name: string
+          primary_image_id: number | null
           session_description: string | null
           session_title: string
           speaker_bio: string | null
@@ -271,6 +349,7 @@ export type Database = {
           event_id: number
           id?: number
           name: string
+          primary_image_id?: number | null
           session_description?: string | null
           session_title: string
           speaker_bio?: string | null
@@ -282,6 +361,7 @@ export type Database = {
           event_id?: number
           id?: number
           name?: string
+          primary_image_id?: number | null
           session_description?: string | null
           session_title?: string
           speaker_bio?: string | null
@@ -294,6 +374,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "speakers_primary_image_id_fkey"
+            columns: ["primary_image_id"]
+            isOneToOne: false
+            referencedRelation: "speaker_images"
             referencedColumns: ["id"]
           },
         ]

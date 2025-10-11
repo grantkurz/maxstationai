@@ -331,6 +331,16 @@ export function ScheduledPostsList({
                           ) : null;
                         })()}
 
+                        {post.status === "posted" && post.posted_urn && post.platform === "instagram" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(`https://www.instagram.com/p/${post.posted_urn}`, '_blank', 'noopener,noreferrer')}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        )}
+
                         {post.status === "failed" && (
                           <Button
                             variant="ghost"

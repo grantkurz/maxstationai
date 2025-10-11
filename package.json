@@ -11,7 +11,7 @@
     "dev:ngrok": "concurrently \"next dev\" \"./ngrok.sh\"",
     "build": "next build",
     "start": "next start",
-    "update-types": "npx supabase gen types typescript --project-id \"hzcgbsakzagvgfuektjb\" > types/supabase.ts"
+    "update-types": "npx supabase gen types typescript --project-id \"lxqtfwuqxerljnuewqxk\" > types/supabase.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.23",

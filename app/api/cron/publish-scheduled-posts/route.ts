@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { ScheduledPostService } from "@/lib/services/scheduled-post-service";
 import { LinkedInService } from "@/lib/services/linkedin-service";
+import { InstagramService } from "@/lib/services/instagram-service";
 import { XService } from "@/lib/services/x-service";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest) {
   try {
     const scheduledPostService = new ScheduledPostService(supabase);
     const linkedInService = new LinkedInService();
+    const instagramService = new InstagramService();
     const xService = new XService();
 
     // Get all pending posts that are ready to publish
@@ -80,17 +82,16 @@ export async function POST(req: NextRequest) {
           let filename: string | undefined;
 
           if (post.image_url) {
-            console.log(`[Cron] Downloading image from ${post.image_url}`);
-            // Download image from Supabase Storage URL
-            const response = await fetch(post.image_url);
-            if (response.ok) {
-              const arrayBuffer = await response.arrayBuffer();
-              imageBuffer = Buffer.from(arrayBuffer);
-              filename = post.image_url.split("/").pop() || "image.jpg";
+            const imageResponse = await fetch(post.image_url);
+            if (!imageResponse.ok) {
+              throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
             }
+            const arrayBuffer = await imageResponse.arrayBuffer();
+            imageBuffer = Buffer.from(arrayBuffer);
+            filename = post.image_url.split('/').pop() || 'image.jpg';
           }
 
-          // Publish to LinkedIn using env credentials
+          // Publish to LinkedIn
           const postUrn = await linkedInService.postToLinkedIn(
             post.post_text,
             imageBuffer,
@@ -102,6 +103,23 @@ export async function POST(req: NextRequest) {
 
           console.log(`[Cron] Successfully published post ${post.id}: ${postUrn}`);
           results.published++;
+        } else if (post.platform === "instagram") {
+          // Validate Instagram requires image URL
+          if (!post.image_url) {
+            throw new Error("Instagram posts require an image URL");
+          }
+
+          // Publish to Instagram
+          const result = await instagramService.postToInstagram(
+            post.image_url,
+            post.post_text
+          );
+          const mediaId = result.mediaId;
+
+          // Mark as posted
+          await scheduledPostService.markAsPosted(post.id, mediaId);
+
+          console.log(`[Cron] Successfully published post ${post.id}: ${mediaId}`);
         } else if (post.platform === "twitter" || post.platform === "x") {
           // Handle image download if URL provided
           let imageBuffer: Buffer | undefined;

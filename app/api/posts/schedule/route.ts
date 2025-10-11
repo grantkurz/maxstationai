@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
     const scheduledTimeStr = formData.get("scheduled_time") as string;
     const timezone = formData.get("timezone") as string;
     const imageFile = formData.get("image") as File | null;
+    const imageUrlParam = formData.get("image_url") as string | null;
 
     // Validate required fields
     if (!announcementIdStr || !postText || !platform || !scheduledTimeStr || !timezone) {
@@ -90,10 +91,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Upload image to Supabase Storage if provided
+    // Handle image: either upload file (LinkedIn) or use provided URL (Instagram)
     let imageUrl: string | null = null;
 
-    if (imageFile) {
+    // For Instagram: use provided image URL
+    if (platform === "instagram" && imageUrlParam) {
+      // Validate URL format
+      if (!imageUrlParam.startsWith("https://")) {
+        return NextResponse.json(
+          { error: "Instagram image URL must use HTTPS protocol" },
+          { status: 400 }
+        );
+      }
+      imageUrl = imageUrlParam;
+    }
+    // For LinkedIn: upload image file to Supabase Storage
+    else if (platform === "linkedin" && imageFile) {
       try {
         // Convert File to ArrayBuffer then to Buffer
         const arrayBuffer = await imageFile.arrayBuffer();
@@ -135,6 +148,14 @@ export async function POST(req: NextRequest) {
           { status: 500 }
         );
       }
+    }
+
+    // Validate Instagram requirements
+    if (platform === "instagram" && !imageUrl) {
+      return NextResponse.json(
+        { error: "Instagram posts require an image URL" },
+        { status: 400 }
+      );
     }
 
     // Create scheduled post

@@ -14,6 +14,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { GenerateAnnouncementButton } from "./GenerateAnnouncementButton";
 import { PostToLinkedInDialog } from "./PostToLinkedInDialog";
 import { PostToXDialog } from "./PostToXDialog";
+import { PostToInstagramDialog } from "./PostToInstagramDialog";
 import { SchedulePostDialog } from "./SchedulePostDialog";
 import { Send, Calendar, Loader2 } from "lucide-react";
 import { Database } from "@/types/supabase";
@@ -38,8 +39,10 @@ export function SpeakerCardWithActions({
   const [loading, setLoading] = useState(false);
   const [linkedInPostDialogOpen, setLinkedInPostDialogOpen] = useState(false);
   const [xPostDialogOpen, setXPostDialogOpen] = useState(false);
+  const [instagramPostDialogOpen, setInstagramPostDialogOpen] = useState(false);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
-  const [selectedPlatform, setSelectedPlatform] = useState<"linkedin" | "twitter">("linkedin");
+  const [primaryImageUrl, setPrimaryImageUrl] = useState<string | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<"linkedin" | "twitter" | "instagram">("linkedin");
 
   // Fetch announcement for this speaker
   const fetchAnnouncement = async () => {
@@ -80,8 +83,26 @@ export function SpeakerCardWithActions({
     }
   };
 
+  // Fetch primary image for the speaker
+  const fetchPrimaryImage = async () => {
+    try {
+      const response = await fetch(`/api/speakers/${speaker.id}/images`);
+      const data = await response.json();
+
+      if (response.ok && data.images?.length > 0) {
+        const primary = data.images.find((img: any) => img.is_primary);
+        if (primary) {
+          setPrimaryImageUrl(primary.public_url);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch primary image:", error);
+    }
+  };
+
   useEffect(() => {
     fetchAnnouncement();
+    fetchPrimaryImage();
   }, [speaker.id]);
 
   const handleOpenLinkedInPost = () => {
@@ -108,7 +129,19 @@ export function SpeakerCardWithActions({
     setXPostDialogOpen(true);
   };
 
-  const handleOpenSchedule = (platform: "linkedin" | "twitter") => {
+  const handleOpenInstagramPost = () => {
+    if (!announcement) {
+      toast({
+        title: "No announcement",
+        description: "Please generate an announcement first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setInstagramPostDialogOpen(true);
+  };
+
+  const handleOpenSchedule = (platform: "linkedin" | "twitter" | "instagram") => {
     if (!announcement) {
       toast({
         title: "No announcement",
@@ -130,6 +163,17 @@ export function SpeakerCardWithActions({
     <>
       <Card>
         <CardHeader>
+          {/* Speaker Image */}
+          {primaryImageUrl && (
+            <div className="mb-4 rounded-lg overflow-hidden border bg-muted">
+              <img
+                src={primaryImageUrl}
+                alt={speaker.name}
+                className="w-full aspect-video object-cover"
+              />
+            </div>
+          )}
+
           <CardTitle>{speaker.name}</CardTitle>
           <CardDescription>{speaker.speaker_title}</CardDescription>
         </CardHeader>
@@ -216,6 +260,31 @@ export function SpeakerCardWithActions({
                     </Button>
                   </div>
                 </div>
+
+                {/* Instagram Buttons */}
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-medium text-muted-foreground w-16">Instagram</span>
+                  <div className="grid grid-cols-2 gap-1 flex-1">
+                    <Button
+                      onClick={handleOpenInstagramPost}
+                      variant="default"
+                      size="sm"
+                      className="w-full bg-pink-600 hover:bg-pink-700"
+                    >
+                      <Send className="h-3 w-3 mr-1" />
+                      Post
+                    </Button>
+                    <Button
+                      onClick={() => handleOpenSchedule("instagram")}
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                    >
+                      <Calendar className="h-3 w-3 mr-1" />
+                      Schedule
+                    </Button>
+                  </div>
+                </div>
               </div>
             ) : (
               <p className="text-xs text-muted-foreground text-center py-2">
@@ -252,6 +321,14 @@ export function SpeakerCardWithActions({
             open={xPostDialogOpen}
             onOpenChange={setXPostDialogOpen}
             announcement={{...announcement, platform: "twitter"}}
+            onSuccess={handleSuccess}
+          />
+
+          {/* Instagram Post Dialog */}
+          <PostToInstagramDialog
+            open={instagramPostDialogOpen}
+            onOpenChange={setInstagramPostDialogOpen}
+            announcement={{...announcement, platform: "instagram", speaker_id: speaker.id}}
             onSuccess={handleSuccess}
           />
 

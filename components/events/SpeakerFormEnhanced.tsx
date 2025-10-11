@@ -17,6 +17,9 @@ import {
 } from "@/components/ui/dialog";
 import { Upload, Wand2 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
+import { ImageUploadArea } from "@/components/speakers/ImageUploadArea";
+import { SpeakerImageGallery } from "@/components/speakers/SpeakerImageGallery";
+import { Separator } from "@/components/ui/separator";
 
 interface SpeakerFormProps {
   eventId: number;
@@ -40,6 +43,7 @@ export function SpeakerFormEnhanced({ eventId, speaker, onSuccess }: SpeakerForm
   const [textDump, setTextDump] = useState("");
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
   const [textDialogOpen, setTextDialogOpen] = useState(false);
+  const [imageRefreshTrigger, setImageRefreshTrigger] = useState(0);
 
   const [formData, setFormData] = useState({
     event_id: eventId,
@@ -353,6 +357,32 @@ export function SpeakerFormEnhanced({ eventId, speaker, onSuccess }: SpeakerForm
           </Button>
         </div>
       </form>
+
+      {/* Image Upload Section - Only shown when editing existing speaker */}
+      {speaker && (
+        <>
+          <Separator className="my-8" />
+
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold">Speaker Images</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Upload and manage images for social media posts. Instagram requires an image for all posts.
+              </p>
+            </div>
+
+            <ImageUploadArea
+              speakerId={speaker.id}
+              onUploadSuccess={() => setImageRefreshTrigger((prev) => prev + 1)}
+            />
+
+            <SpeakerImageGallery
+              speakerId={speaker.id}
+              refreshTrigger={imageRefreshTrigger}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }
