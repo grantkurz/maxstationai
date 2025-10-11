@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
 
     // Generate announcement using Claude
     const { text } = await generateText({
-      model: anthropic(ANTHROPIC_MODELS["claude-sonnet-4.5"]),
+      model: anthropic(ANTHROPIC_MODELS["claude-opus-4.1"]),
       messages: [
         {
           role: "user",
