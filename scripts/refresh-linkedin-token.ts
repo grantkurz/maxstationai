@@ -1,3 +1,4 @@
+// @ts-nocheck - Standalone script with external dependencies
 /**
  * Script to refresh LinkedIn access token using a refresh token
  *

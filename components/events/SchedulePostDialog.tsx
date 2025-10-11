@@ -45,8 +45,16 @@ interface SchedulePostDialogProps {
   onSuccess?: () => void;
 }
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/jpg"];
+const MAX_FILE_SIZE_LINKEDIN = 10 * 1024 * 1024; // 10MB for LinkedIn
+const MAX_FILE_SIZE_X = 5 * 1024 * 1024; // 5MB for X/Twitter
+const ACCEPTED_IMAGE_TYPES_LINKEDIN = ["image/png", "image/jpeg", "image/jpg"];
+const ACCEPTED_IMAGE_TYPES_X = [
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/gif",
+  "image/webp",
+];
 
 // Get user's timezone
 const getUserTimezone = () => {
@@ -147,24 +155,36 @@ export function SchedulePostDialog({
     }
   };
 
+  // Platform-specific constraints
+  const isXPlatform = announcement.platform === "twitter" || announcement.platform === "x";
+  const maxFileSize = isXPlatform ? MAX_FILE_SIZE_X : MAX_FILE_SIZE_LINKEDIN;
+  const acceptedImageTypes = isXPlatform
+    ? ACCEPTED_IMAGE_TYPES_X
+    : ACCEPTED_IMAGE_TYPES_LINKEDIN;
+
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
 
     if (!file) return;
 
-    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+    if (!acceptedImageTypes.includes(file.type)) {
       toast({
         title: "Invalid file type",
-        description: "Please upload a PNG or JPEG image.",
+        description: isXPlatform
+          ? "Please upload a PNG, JPEG, GIF, or WebP image."
+          : "Please upload a PNG or JPEG image.",
         variant: "destructive",
       });
       return;
     }
 
-    if (file.size > MAX_FILE_SIZE) {
+    if (file.size > maxFileSize) {
+      const maxSizeMB = maxFileSize / 1024 / 1024;
       toast({
         title: "File too large",
-        description: "Image must be less than 5MB.",
+        description: `Image must be less than ${maxSizeMB}MB for ${
+          isXPlatform ? "X/Twitter" : "LinkedIn"
+        }.`,
         variant: "destructive",
       });
       return;
@@ -184,12 +204,21 @@ export function SchedulePostDialog({
     });
   }, [toast]);
 
+  const dropzoneAccept = isXPlatform
+    ? ({
+        "image/png": [".png"],
+        "image/jpeg": [".jpg", ".jpeg"],
+        "image/gif": [".gif"],
+        "image/webp": [".webp"],
+      } as const)
+    : ({
+        "image/png": [".png"],
+        "image/jpeg": [".jpg", ".jpeg"],
+      } as const);
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: {
-      'image/png': ['.png'],
-      'image/jpeg': ['.jpg', '.jpeg'],
-    },
+    accept: dropzoneAccept as any,
     maxFiles: 1,
     disabled: scheduling || scheduled,
   });
@@ -228,10 +257,43 @@ export function SchedulePostDialog({
         formData.append("image_url", primaryImageUrl);
       }
 
-      const response = await fetch("/api/posts/schedule", {
-        method: "POST",
-        body: formData,
-      });
+      // Determine the correct API endpoint
+      const apiEndpoint = isXPlatform ? "/api/x/schedule" : "/api/posts/schedule";
+
+      let response;
+
+      if (isXPlatform) {
+        // X API uses JSON
+        response = await fetch(apiEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            announcement_id: announcement.id,
+            scheduled_time: scheduledDateTime.toISOString(),
+            timezone: selectedTimezone,
+            image_url: imageUrl,
+          }),
+        });
+      } else {
+        // LinkedIn API uses FormData
+        const formData = new FormData();
+        formData.append("announcement_id", announcement.id.toString());
+        formData.append("post_text", announcement.announcement_text);
+        formData.append("platform", announcement.platform);
+        formData.append("scheduled_time", scheduledDateTime.toISOString());
+        formData.append("timezone", selectedTimezone);
+
+        if (uploadedImage) {
+          formData.append("image", uploadedImage);
+        }
+
+        response = await fetch(apiEndpoint, {
+          method: "POST",
+          body: formData,
+        });
+      }
 
       const data = await response.json();
 
@@ -261,7 +323,12 @@ export function SchedulePostDialog({
 
   const handleCancelSchedule = async (scheduleId: number) => {
     try {
-      const response = await fetch(`/api/posts/schedule/${scheduleId}`, {
+      // Use platform-specific endpoint for X, generic endpoint for others
+      const endpoint = isXPlatform
+        ? `/api/x/scheduled/${scheduleId}`
+        : `/api/posts/schedule/${scheduleId}`;
+
+      const response = await fetch(endpoint, {
         method: "DELETE",
       });
 
@@ -597,6 +664,15 @@ export function SchedulePostDialog({
                             Instagram requires an image for all posts. Please upload a speaker image in the speaker profile before scheduling to Instagram.
                           </p>
                         </div>
+                      <div>
+                        <p className="text-sm font-medium">
+                          {isDragActive ? "Drop image here" : "Drag & drop image here"}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {isXPlatform
+                            ? "PNG, JPEG, GIF, or WebP • Max 5MB"
+                            : "PNG or JPEG • Max 10MB"}
+                        </p>
                       </div>
                     </div>
                   )}

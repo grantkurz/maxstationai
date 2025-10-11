@@ -49,7 +49,26 @@ const statusColors = {
 const platformColors = {
   linkedin: "bg-blue-600 text-white",
   twitter: "bg-sky-500 text-white",
+  x: "bg-sky-500 text-white",
   instagram: "bg-pink-600 text-white",
+};
+
+const getPlatformDisplayName = (platform: string): string => {
+  if (platform === "twitter" || platform === "x") return "X";
+  if (platform === "linkedin") return "LinkedIn";
+  if (platform === "instagram") return "Instagram";
+  return platform.charAt(0).toUpperCase() + platform.slice(1);
+};
+
+const getPostUrl = (platform: string, urn: string): string | null => {
+  if (platform === "linkedin") {
+    return `https://www.linkedin.com/feed/update/${urn}`;
+  }
+  if (platform === "twitter" || platform === "x") {
+    // Twitter/X URLs use tweet ID
+    return `https://twitter.com/i/status/${urn}`;
+  }
+  return null;
 };
 
 export function ScheduledPostsList({
@@ -257,8 +276,13 @@ export function ScheduledPostsList({
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={platformColors[post.platform]}>
-                        {post.platform.charAt(0).toUpperCase() + post.platform.slice(1)}
+                      <Badge
+                        className={
+                          platformColors[post.platform as keyof typeof platformColors] ||
+                          "bg-gray-500 text-white"
+                        }
+                      >
+                        {getPlatformDisplayName(post.platform)}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -272,7 +296,10 @@ export function ScheduledPostsList({
                     <TableCell>
                       <Badge
                         variant="secondary"
-                        className={statusColors[post.status]}
+                        className={
+                          statusColors[post.status as keyof typeof statusColors] ||
+                          "bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-300"
+                        }
                       >
                         {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
                       </Badge>
@@ -289,15 +316,20 @@ export function ScheduledPostsList({
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {post.status === "posted" && post.posted_urn && post.platform === "linkedin" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(`https://www.linkedin.com/feed/update/${post.posted_urn}`, '_blank', 'noopener,noreferrer')}
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                        )}
+                        {post.status === "posted" && post.posted_urn && (() => {
+                          const postUrl = getPostUrl(post.platform, post.posted_urn);
+                          return postUrl ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                window.open(postUrl, "_blank", "noopener,noreferrer")
+                              }
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          ) : null;
+                        })()}
 
                         {post.status === "posted" && post.posted_urn && post.platform === "instagram" && (
                           <Button

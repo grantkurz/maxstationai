@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { GenerateAnnouncementButton } from "./GenerateAnnouncementButton";
 import { PostDialog } from "./PostDialog";
+import { PostToLinkedInDialog } from "./PostToLinkedInDialog";
+import { PostToXDialog } from "./PostToXDialog";
 import { SchedulePostDialog } from "./SchedulePostDialog";
 import { Send, Calendar, Loader2 } from "lucide-react";
 import { Database } from "@/types/supabase";
@@ -35,9 +37,11 @@ export function SpeakerCardWithActions({
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
   const [loading, setLoading] = useState(false);
-  const [postDialogOpen, setPostDialogOpen] = useState(false);
+  const [linkedInPostDialogOpen, setLinkedInPostDialogOpen] = useState(false);
+  const [xPostDialogOpen, setXPostDialogOpen] = useState(false);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [primaryImageUrl, setPrimaryImageUrl] = useState<string | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<"linkedin" | "twitter">("linkedin");
 
   // Fetch announcement for this speaker
   const fetchAnnouncement = async () => {
@@ -100,7 +104,7 @@ export function SpeakerCardWithActions({
     fetchPrimaryImage();
   }, [speaker.id]);
 
-  const handleOpenPost = () => {
+  const handleOpenLinkedInPost = () => {
     if (!announcement) {
       toast({
         title: "No announcement",
@@ -109,10 +113,10 @@ export function SpeakerCardWithActions({
       });
       return;
     }
-    setPostDialogOpen(true);
+    setLinkedInPostDialogOpen(true);
   };
 
-  const handleOpenSchedule = () => {
+  const handleOpenXPost = () => {
     if (!announcement) {
       toast({
         title: "No announcement",
@@ -121,6 +125,19 @@ export function SpeakerCardWithActions({
       });
       return;
     }
+    setXPostDialogOpen(true);
+  };
+
+  const handleOpenSchedule = (platform: "linkedin" | "twitter") => {
+    if (!announcement) {
+      toast({
+        title: "No announcement",
+        description: "Please generate an announcement first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSelectedPlatform(platform);
     setScheduleDialogOpen(true);
   };
 
@@ -180,25 +197,56 @@ export function SpeakerCardWithActions({
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               </div>
             ) : announcement ? (
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  onClick={handleOpenPost}
-                  variant="default"
-                  size="sm"
-                  className="w-full"
-                >
-                  <Send className="h-4 w-4 mr-1" />
-                  Post
-                </Button>
-                <Button
-                  onClick={handleOpenSchedule}
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                >
-                  <Calendar className="h-4 w-4 mr-1" />
-                  Schedule
-                </Button>
+              <div className="space-y-2">
+                {/* LinkedIn Buttons */}
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-medium text-muted-foreground w-16">LinkedIn</span>
+                  <div className="grid grid-cols-2 gap-1 flex-1">
+                    <Button
+                      onClick={handleOpenLinkedInPost}
+                      variant="default"
+                      size="sm"
+                      className="w-full"
+                    >
+                      <Send className="h-3 w-3 mr-1" />
+                      Post
+                    </Button>
+                    <Button
+                      onClick={() => handleOpenSchedule("linkedin")}
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                    >
+                      <Calendar className="h-3 w-3 mr-1" />
+                      Schedule
+                    </Button>
+                  </div>
+                </div>
+
+                {/* X/Twitter Buttons */}
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-medium text-muted-foreground w-16">X</span>
+                  <div className="grid grid-cols-2 gap-1 flex-1">
+                    <Button
+                      onClick={handleOpenXPost}
+                      variant="default"
+                      size="sm"
+                      className="w-full bg-sky-500 hover:bg-sky-600"
+                    >
+                      <Send className="h-3 w-3 mr-1" />
+                      Post
+                    </Button>
+                    <Button
+                      onClick={() => handleOpenSchedule("twitter")}
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                    >
+                      <Calendar className="h-3 w-3 mr-1" />
+                      Schedule
+                    </Button>
+                  </div>
+                </div>
               </div>
             ) : (
               <p className="text-xs text-muted-foreground text-center py-2">
@@ -229,10 +277,11 @@ export function SpeakerCardWithActions({
             onSuccess={handleSuccess}
           />
 
+          {/* Schedule Dialog - platform aware */}
           <SchedulePostDialog
             open={scheduleDialogOpen}
             onOpenChange={setScheduleDialogOpen}
-            announcement={announcement}
+            announcement={{...announcement, platform: selectedPlatform}}
             existingSchedules={scheduledPosts}
             onSuccess={handleSuccess}
           />

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ScheduledPostService } from "@/lib/services/scheduled-post-service";
 import { LinkedInService } from "@/lib/services/linkedin-service";
 import { InstagramService } from "@/lib/services/instagram-service";
+import { XService } from "@/lib/services/x-service";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest) {
     const scheduledPostService = new ScheduledPostService(supabase);
     const linkedInService = new LinkedInService();
     const instagramService = new InstagramService();
+    const xService = new XService();
 
     // Get all pending posts that are ready to publish
     const pendingPosts = await scheduledPostService.getPendingScheduledPosts();
@@ -75,7 +77,7 @@ export async function POST(req: NextRequest) {
         console.log(`[Cron] Publishing post ${post.id} (${post.platform})`);
 
         if (post.platform === "linkedin") {
-          // Fetch image if URL is provided
+          // Handle image download if URL provided
           let imageBuffer: Buffer | undefined;
           let filename: string | undefined;
 
@@ -118,6 +120,28 @@ export async function POST(req: NextRequest) {
           await scheduledPostService.markAsPosted(post.id, mediaId);
 
           console.log(`[Cron] Successfully published post ${post.id}: ${mediaId}`);
+        } else if (post.platform === "twitter" || post.platform === "x") {
+          // Handle image download if URL provided
+          let imageBuffer: Buffer | undefined;
+          let filename: string | undefined;
+
+          if (post.image_url) {
+            console.log(`[Cron] Downloading image from ${post.image_url}`);
+            imageBuffer = await xService.downloadImage(post.image_url);
+            filename = post.image_url.split("/").pop() || "image.jpg";
+          }
+
+          // Publish to X/Twitter
+          const tweetId = await xService.postToX(
+            post.post_text,
+            imageBuffer,
+            filename
+          );
+
+          // Mark as posted
+          await scheduledPostService.markAsPosted(post.id, tweetId);
+
+          console.log(`[Cron] Successfully published post ${post.id}: ${tweetId}`);
           results.published++;
         } else {
           throw new Error(`Platform ${post.platform} is not yet supported`);
