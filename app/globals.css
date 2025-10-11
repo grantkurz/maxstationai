@@ -70,3 +70,57 @@
 .sentence-case:first-letter {
   text-transform: uppercase;
 }
+
+/* Custom animations for landing page */
+@layer utilities {
+  .animate-gradient-shift {
+    animation: gradient-shift 8s ease infinite;
+  }
+
+  .animate-gradient-x {
+    animation: gradient-x 3s ease infinite;
+    background-size: 200% auto;
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-float-delayed {
+    animation: float 6s ease-in-out 3s infinite;
+  }
+
+  .bg-grid-pattern {
+    background-image:
+      linear-gradient(to right, hsl(var(--foreground) / 0.1) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--foreground) / 0.1) 1px, transparent 1px);
+    background-size: 4rem 4rem;
+  }
+}
+
+@keyframes gradient-shift {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes gradient-x {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
