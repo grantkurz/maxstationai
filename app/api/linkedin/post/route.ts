@@ -11,9 +11,9 @@ export const dynamic = "force-dynamic";
  * POST /api/linkedin/post
  * Posts an announcement immediately to LinkedIn with optional image
  *
- * Request body (FormData):
+ * Request body (JSON):
  * - announcement_id: number (required)
- * - image: File (optional)
+ * - image_url: string (optional) - URL to speaker's primary image
  */
 export async function POST(req: NextRequest) {
   const supabase = createRouteHandlerClient<Database>({ cookies });
@@ -29,22 +29,19 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Parse FormData (supports file upload)
-    const formData = await req.formData();
-    const announcementIdStr = formData.get("announcement_id") as string;
-    const imageFile = formData.get("image") as File | null;
+    // Parse JSON request body
+    const body = await req.json();
+    const { announcement_id, image_url } = body;
 
     // Validate required fields
-    if (!announcementIdStr) {
+    if (!announcement_id) {
       return NextResponse.json(
         { error: "Missing required field: announcement_id" },
         { status: 400 }
       );
     }
 
-    const announcementId = parseInt(announcementIdStr);
-
-    if (isNaN(announcementId)) {
+    if (typeof announcement_id !== "number" || isNaN(announcement_id)) {
       return NextResponse.json(
         { error: "Invalid announcement_id: must be a number" },
         { status: 400 }
@@ -54,7 +51,7 @@ export async function POST(req: NextRequest) {
     // Fetch and validate announcement ownership
     const announcementRepo = new AnnouncementRepository(supabase);
     const announcement = await announcementRepo.getAnnouncementById(
-      announcementId
+      announcement_id
     );
 
     if (!announcement) {
@@ -74,51 +71,42 @@ export async function POST(req: NextRequest) {
     // Note: Platform validation removed to allow cross-platform posting
     // Users can post any announcement to LinkedIn regardless of original platform
 
-    // Process image file if provided
+    // Process image URL if provided
     let imageBuffer: Buffer | undefined;
     let filename: string | undefined;
 
-    if (imageFile) {
-      // Validate file type
-      const validImageTypes = [
-        "image/jpeg",
-        "image/jpg",
-        "image/png",
-        "image/gif",
-        "image/webp",
-      ];
+    if (image_url) {
+      console.log(`Downloading image from URL: ${image_url}`);
 
-      if (!validImageTypes.includes(imageFile.type)) {
+      try {
+        // Download image from URL
+        const response = await fetch(image_url);
+        if (!response.ok) {
+          throw new Error(`Failed to download image: ${response.statusText}`);
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        imageBuffer = Buffer.from(arrayBuffer);
+
+        // Extract filename from URL or use default
+        const urlPath = new URL(image_url).pathname;
+        filename = urlPath.split('/').pop() || 'speaker-image.jpg';
+
+        console.log(`Downloaded image: ${filename} (${imageBuffer.length} bytes)`);
+      } catch (error) {
+        console.error("Failed to download image:", error);
         return NextResponse.json(
-          {
-            error: `Invalid image type: ${imageFile.type}. Supported types: JPEG, PNG, GIF, WebP`,
-          },
+          { error: "Failed to download speaker image" },
           { status: 400 }
         );
       }
-
-      // Validate file size (max 10MB)
-      const maxSizeBytes = 10 * 1024 * 1024; // 10MB
-      if (imageFile.size > maxSizeBytes) {
-        return NextResponse.json(
-          { error: "Image file size exceeds 10MB limit" },
-          { status: 400 }
-        );
-      }
-
-      // Convert File to Buffer
-      const arrayBuffer = await imageFile.arrayBuffer();
-      imageBuffer = Buffer.from(arrayBuffer);
-      filename = imageFile.name;
-
-      console.log(`Processing image upload: ${filename} (${imageFile.size} bytes)`);
     }
 
     // Initialize LinkedIn service
     const linkedInService = new LinkedInService();
 
     // Post to LinkedIn
-    console.log(`Posting announcement ${announcementId} to LinkedIn...`);
+    console.log(`Posting announcement ${announcement_id} to LinkedIn...`);
     const postUrn = await linkedInService.postToLinkedIn(
       announcement.announcement_text,
       imageBuffer,
@@ -131,7 +119,7 @@ export async function POST(req: NextRequest) {
       success: true,
       post_urn: postUrn,
       message: "Successfully posted to LinkedIn",
-      announcement_id: announcementId,
+      announcement_id: announcement_id,
     });
   } catch (error) {
     console.error("Error in LinkedIn post API:", error);

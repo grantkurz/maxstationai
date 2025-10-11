@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,27 +15,21 @@ import { useToast } from "@/components/ui/use-toast";
 import { Progress } from "@/components/ui/progress";
 import {
   Send,
-  Upload,
-  X,
   Check,
-  AlertCircle,
+  AlertTriangle,
   Image as ImageIcon,
   Loader2,
 } from "lucide-react";
 import { Database } from "@/types/supabase";
-import { useDropzone } from "react-dropzone";
 
 type Announcement = Database["public"]["Tables"]["announcements"]["Row"];
 
 interface PostToLinkedInDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  announcement: Announcement;
+  announcement: Announcement & { speaker_id?: number };
   onSuccess?: () => void;
 }
-
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/jpg"];
 
 export function PostToLinkedInDialog({
   open,
@@ -46,63 +40,44 @@ export function PostToLinkedInDialog({
   const { toast } = useToast();
   const [posting, setPosting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadedImage, setUploadedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [primaryImageUrl, setPrimaryImageUrl] = useState<string | null>(null);
+  const [loadingImage, setLoadingImage] = useState(false);
   const [postUrn, setPostUrn] = useState<string | null>(null);
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    const file = acceptedFiles[0];
+  // Fetch primary image when dialog opens
+  useEffect(() => {
+    if (open && announcement.speaker_id) {
+      fetchPrimaryImage();
+    }
+  }, [open, announcement.speaker_id]);
 
-    if (!file) return;
+  const fetchPrimaryImage = async () => {
+    setLoadingImage(true);
+    try {
+      const response = await fetch(`/api/speakers/${announcement.speaker_id}/images`);
+      const data = await response.json();
 
-    // Validate file type
-    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      if (response.ok && data.images?.length > 0) {
+        const primary = data.images.find((img: any) => img.is_primary);
+        if (primary) {
+          setPrimaryImageUrl(primary.public_url);
+        } else {
+          setPrimaryImageUrl(null);
+        }
+      } else {
+        setPrimaryImageUrl(null);
+      }
+    } catch (error) {
+      console.error("Failed to fetch primary image:", error);
+      setPrimaryImageUrl(null);
       toast({
-        title: "Invalid file type",
-        description: "Please upload a PNG or JPEG image.",
+        title: "Error",
+        description: "Failed to load speaker image.",
         variant: "destructive",
       });
-      return;
+    } finally {
+      setLoadingImage(false);
     }
-
-    // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
-      toast({
-        title: "File too large",
-        description: "Image must be less than 5MB.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setUploadedImage(file);
-
-    // Create preview
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-
-    toast({
-      title: "Image uploaded",
-      description: `${file.name} ready to post.`,
-    });
-  }, [toast]);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'image/png': ['.png'],
-      'image/jpeg': ['.jpg', '.jpeg'],
-    },
-    maxFiles: 1,
-    disabled: posting || !!postUrn,
-  });
-
-  const removeImage = () => {
-    setUploadedImage(null);
-    setImagePreview(null);
   };
 
   const handlePost = async () => {
@@ -110,7 +85,7 @@ export function PostToLinkedInDialog({
     setUploadProgress(0);
 
     try {
-      // Simulate upload progress (in real implementation, track actual upload)
+      // Simulate upload progress
       const progressInterval = setInterval(() => {
         setUploadProgress((prev) => {
           if (prev >= 90) {
@@ -121,18 +96,13 @@ export function PostToLinkedInDialog({
         });
       }, 200);
 
-      const formData = new FormData();
-      formData.append("announcement_id", announcement.id.toString());
-      formData.append("post_text", announcement.announcement_text);
-      formData.append("platform", announcement.platform);
-
-      if (uploadedImage) {
-        formData.append("image", uploadedImage);
-      }
-
-      const response = await fetch("/api/posts/publish", {
+      const response = await fetch("/api/linkedin/post", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          announcement_id: announcement.id,
+          image_url: primaryImageUrl,
+        }),
       });
 
       clearInterval(progressInterval);
@@ -167,8 +137,7 @@ export function PostToLinkedInDialog({
 
   const handleClose = () => {
     if (!posting) {
-      setUploadedImage(null);
-      setImagePreview(null);
+      setPrimaryImageUrl(null);
       setPostUrn(null);
       setUploadProgress(0);
       onOpenChange(false);
@@ -186,7 +155,7 @@ export function PostToLinkedInDialog({
           <DialogDescription>
             {postUrn
               ? "Your post has been published successfully!"
-              : "Review your announcement and optionally add an image before posting."}
+              : "Review your announcement before posting to LinkedIn."}
           </DialogDescription>
         </DialogHeader>
 
@@ -224,72 +193,55 @@ export function PostToLinkedInDialog({
               placeholder="Your announcement text..."
             />
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{announcement.platform.charAt(0).toUpperCase() + announcement.platform.slice(1)}</span>
+              <span>LinkedIn</span>
               <span>{announcement.announcement_text.length} characters</span>
             </div>
           </div>
 
-          {/* Image Upload Section */}
+          {/* Image Display */}
           {!postUrn && (
             <div className="space-y-3">
-              <Label>Image (Optional)</Label>
+              <Label>Speaker Image</Label>
 
-              {!imagePreview ? (
-                <div
-                  {...getRootProps()}
-                  className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                    isDragActive
-                      ? "border-primary bg-primary/5"
-                      : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50"
-                  } ${posting ? "opacity-50 cursor-not-allowed" : ""}`}
-                >
-                  <input {...getInputProps()} />
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="rounded-full bg-muted p-3">
-                      <Upload className="h-6 w-6 text-muted-foreground" />
+              {loadingImage ? (
+                <div className="flex items-center justify-center py-12 border rounded-lg">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : primaryImageUrl ? (
+                <div className="rounded-lg border overflow-hidden">
+                  <img
+                    src={primaryImageUrl}
+                    alt="Speaker"
+                    className="w-full h-auto max-h-96 object-contain bg-muted"
+                  />
+                  <div className="bg-muted p-3 text-sm">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <ImageIcon className="h-4 w-4" />
+                      <span>Speaker primary image</span>
                     </div>
-                    <div>
-                      <p className="font-medium">
-                        {isDragActive ? "Drop image here" : "Drag & drop image here"}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        or click to browse
-                      </p>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      PNG or JPEG, max 5MB
-                    </p>
                   </div>
                 </div>
               ) : (
-                <div className="relative rounded-lg border overflow-hidden">
-                  <img
-                    src={imagePreview}
-                    alt="Upload preview"
-                    className="w-full h-auto max-h-96 object-contain bg-muted"
-                  />
-                  {!posting && (
-                    <Button
-                      onClick={removeImage}
-                      variant="destructive"
-                      size="sm"
-                      className="absolute top-2 right-2"
-                    >
-                      <X className="h-4 w-4 mr-1" />
-                      Remove
-                    </Button>
-                  )}
-                  {uploadedImage && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/75 text-white p-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <ImageIcon className="h-4 w-4" />
-                        <span className="truncate">{uploadedImage.name}</span>
-                        <span className="text-muted-foreground ml-auto">
-                          {(uploadedImage.size / 1024 / 1024).toFixed(2)} MB
-                        </span>
-                      </div>
+                <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900 p-6">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-amber-900 dark:text-amber-100 mb-2">
+                        No speaker image available
+                      </p>
+                      <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
+                        LinkedIn posts with images get better engagement. Please upload a speaker image in the speaker profile.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleClose}
+                        className="border-amber-300 hover:bg-amber-100 dark:border-amber-800 dark:hover:bg-amber-900/50"
+                      >
+                        Go to Speaker Profile
+                      </Button>
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
             </div>
@@ -299,7 +251,7 @@ export function PostToLinkedInDialog({
           {posting && uploadProgress > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Posting...</span>
+                <span className="text-muted-foreground">Posting to LinkedIn...</span>
                 <span className="font-medium">{uploadProgress}%</span>
               </div>
               <Progress value={uploadProgress} className="h-2" />
@@ -312,7 +264,7 @@ export function PostToLinkedInDialog({
               <>
                 <Button
                   onClick={handlePost}
-                  disabled={posting}
+                  disabled={posting || loadingImage}
                   className="flex-1"
                   size="lg"
                 >
