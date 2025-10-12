@@ -43,6 +43,14 @@ interface PublishMediaResponse {
 }
 
 /**
+ * Response from container status check
+ */
+interface ContainerStatusResponse {
+  status_code: string; // IN_PROGRESS, FINISHED, ERROR, EXPIRED
+  status?: string; // Additional status info
+}
+
+/**
  * Instagram error response structure
  */
 interface InstagramErrorResponse {
@@ -268,6 +276,158 @@ export class InstagramService {
   }
 
   /**
+   * Make a GET request to Facebook Graph API
+   * @private
+   * @param path - API endpoint path (e.g., "/123456")
+   * @param params - Query parameters
+   * @returns Parsed JSON response
+   * @throws InstagramAPIError if request fails
+   */
+  private async graphGet<T>(
+    path: string,
+    params: Record<string, string> = {}
+  ): Promise<T> {
+    const url = `${GRAPH_API_HOST}/${GRAPH_API_VERSION}${path}`;
+
+    // Build query parameters with access token
+    const queryParams = new URLSearchParams({
+      ...params,
+      access_token: this.accessToken,
+    });
+
+    try {
+      const response = await fetch(`${url}?${queryParams.toString()}`, {
+        method: "GET",
+      });
+
+      const responseText = await response.text();
+
+      if (!response.ok) {
+        let errorMessage = `Instagram API error: ${response.statusText}`;
+
+        try {
+          const errorData = JSON.parse(responseText) as InstagramErrorResponse;
+          if (errorData.error) {
+            errorMessage = `Instagram API error: ${errorData.error.message} (Code: ${errorData.error.code})`;
+          }
+        } catch {
+          errorMessage = `Instagram API error: ${responseText}`;
+        }
+
+        throw new InstagramAPIError(
+          errorMessage,
+          response.status,
+          responseText
+        );
+      }
+
+      const responseData = JSON.parse(responseText) as T;
+      return responseData;
+    } catch (error) {
+      if (error instanceof InstagramAPIError) {
+        throw error;
+      }
+      throw new InstagramAPIError(
+        `Failed to make Graph API request: ${error instanceof Error ? error.message : "Unknown error"}`,
+        500
+      );
+    }
+  }
+
+  /**
+   * Sleep utility for async delays
+   * @private
+   * @param ms - Milliseconds to sleep
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Check the status of a media container
+   * @private
+   * @param containerId - The container ID to check
+   * @returns Container status response
+   */
+  private async checkContainerStatus(
+    containerId: string
+  ): Promise<ContainerStatusResponse> {
+    const path = `/${containerId}`;
+    const params = {
+      fields: "status_code",
+    };
+
+    return await this.graphGet<ContainerStatusResponse>(path, params);
+  }
+
+  /**
+   * Wait for a media container to be ready for publishing
+   * Polls the container status until it's FINISHED or times out
+   * @private
+   * @param containerId - The container ID to wait for
+   * @param maxWaitSeconds - Maximum time to wait in seconds (default: 60)
+   * @returns true when ready, throws if error or timeout
+   */
+  private async waitForContainerReady(
+    containerId: string,
+    maxWaitSeconds: number = 60
+  ): Promise<void> {
+    console.log(`Waiting for container ${containerId} to be ready...`);
+
+    const startTime = Date.now();
+    const maxWaitMs = maxWaitSeconds * 1000;
+    let attempt = 0;
+
+    while (Date.now() - startTime < maxWaitMs) {
+      attempt++;
+
+      try {
+        const status = await this.checkContainerStatus(containerId);
+        console.log(
+          `Container status check #${attempt}: ${status.status_code}`
+        );
+
+        if (status.status_code === "FINISHED") {
+          console.log(`Container ${containerId} is ready!`);
+          return;
+        }
+
+        if (status.status_code === "ERROR") {
+          throw new InstagramAPIError(
+            "Container processing failed with ERROR status",
+            400
+          );
+        }
+
+        if (status.status_code === "EXPIRED") {
+          throw new InstagramAPIError(
+            "Container expired before it could be published",
+            400
+          );
+        }
+
+        // Status is IN_PROGRESS, wait before checking again
+        // Use exponential backoff: 2s, 4s, 6s, 8s, 10s, then 10s intervals
+        const waitTime = Math.min(2000 * attempt, 10000);
+        console.log(`Container still processing, waiting ${waitTime}ms...`);
+        await this.sleep(waitTime);
+      } catch (error) {
+        if (error instanceof InstagramAPIError) {
+          throw error;
+        }
+        // If status check fails, wait and retry
+        console.warn(`Status check failed: ${error}, retrying...`);
+        await this.sleep(2000);
+      }
+    }
+
+    throw new InstagramAPIError(
+      `Container did not become ready within ${maxWaitSeconds} seconds. Try publishing manually later.`,
+      408
+    );
+  }
+
+  /**
    * Step 1: Create a media container on Instagram
    * Reserves a container for the image and caption
    *
@@ -423,7 +583,11 @@ export class InstagramService {
       console.log("Starting Instagram post workflow...");
       const creationId = await this.createMediaContainer(imageUrl, caption);
 
-      // Step 2: Publish media
+      // Step 2: Wait for container to be ready
+      // Instagram needs time to download and process the image
+      await this.waitForContainerReady(creationId);
+
+      // Step 3: Publish media
       const mediaId = await this.publishMedia(creationId);
 
       console.log(
