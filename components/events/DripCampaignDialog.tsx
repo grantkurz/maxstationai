@@ -50,6 +50,7 @@ interface ContentPreview {
   generatedAnnouncement: string;
   characterCount: number;
   hasExistingAnnouncement: boolean;
+  imageUrl: string | null;
 }
 
 export function DripCampaignDialog({
@@ -232,27 +233,21 @@ export function DripCampaignDialog({
   const formatDateTime = (isoString: string) => {
     const date = new Date(isoString);
 
-    // Format date using UTC to prevent timezone shift
-    // This ensures the date displays as intended regardless of user's timezone
-    const year = date.getUTCFullYear();
-    const month = date.getUTCMonth();
-    const day = date.getUTCDate();
-    const hours = date.getUTCHours();
-    const minutes = date.getUTCMinutes();
-
-    // Create a date in the user's local timezone but with the UTC values
-    const localDate = new Date(year, month, day, hours, minutes);
-
+    // The date is stored in UTC. We need to display it in the event's timezone.
+    // Since we don't have the event timezone in this component, we display the UTC time
+    // which represents the actual scheduled time regardless of viewer's timezone.
     return {
-      date: localDate.toLocaleDateString(undefined, {
+      date: date.toLocaleDateString(undefined, {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
-        year: 'numeric'
+        year: 'numeric',
+        timeZone: event.timezone || 'UTC'
       }),
-      time: localDate.toLocaleTimeString([], {
+      time: date.toLocaleTimeString([], {
         hour: "2-digit",
-        minute: "2-digit"
+        minute: "2-digit",
+        timeZone: event.timezone || 'UTC'
       }),
     };
   };
@@ -478,6 +473,20 @@ export function DripCampaignDialog({
                         {/* Show content preview if available */}
                         {contentPreview && (
                           <div className="mt-3 space-y-2">
+                            {/* Speaker Image */}
+                            {contentPreview.imageUrl && (
+                              <div className="flex items-center gap-2">
+                                <img
+                                  src={contentPreview.imageUrl}
+                                  alt={`${item.speakerName} profile`}
+                                  className="w-12 h-12 rounded-lg object-cover border"
+                                />
+                                <span className="text-xs text-muted-foreground">
+                                  Image will be included in post
+                                </span>
+                              </div>
+                            )}
+
                             <Button
                               variant="ghost"
                               size="sm"

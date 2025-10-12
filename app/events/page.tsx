@@ -346,12 +346,17 @@ function EventCard({
                 <Calendar className="w-4 h-4 text-muted-foreground group-hover/item:text-violet-600 dark:group-hover/item:text-violet-400 transition-colors" />
               </div>
               <span className="font-medium text-foreground/90">
-                {eventDate.toLocaleDateString('en-US', {
-                  weekday: 'short',
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric'
-                })}
+                {(() => {
+                  // For date-only values, parse directly to avoid UTC conversion
+                  const [year, month, day] = event.date.split('-').map(Number);
+                  const localDate = new Date(year, month - 1, day);
+                  return localDate.toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                  });
+                })()}
               </span>
             </div>
 

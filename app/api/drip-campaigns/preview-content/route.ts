@@ -24,6 +24,7 @@ interface SpeakerPreview {
   generatedAnnouncement: string;
   characterCount: number;
   hasExistingAnnouncement: boolean;
+  imageUrl: string | null;
 }
 
 /**
@@ -108,6 +109,16 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
+        // Fetch speaker's primary image
+        const { data: images } = await supabase
+          .from("speaker_images")
+          .select("*")
+          .eq("speaker_id", speakerId)
+          .eq("is_primary", true)
+          .limit(1);
+
+        const primaryImageUrl = images && images.length > 0 ? images[0].public_url : null;
+
         // Check for existing announcement
         let initialAnnouncement: string;
         let hasExisting = false;
@@ -156,6 +167,7 @@ export async function POST(req: NextRequest) {
           generatedAnnouncement,
           characterCount: generatedAnnouncement.length,
           hasExistingAnnouncement: hasExisting,
+          imageUrl: primaryImageUrl,
         });
       } catch (error) {
         console.error(`Error generating preview for speaker ${speakerId}:`, error);
