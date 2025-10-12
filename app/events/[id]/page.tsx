@@ -95,7 +95,17 @@ export default async function EventDetailPage({
           <CardContent className="space-y-4">
             <div>
               <span className="font-medium">Date:</span>{" "}
-              {new Date(event.date).toLocaleDateString()}
+              {(() => {
+                // For date-only values, parse directly to avoid UTC conversion
+                const [year, month, day] = event.date.split('-').map(Number);
+                const localDate = new Date(year, month - 1, day);
+                return localDate.toLocaleDateString('en-US', {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                });
+              })()}
             </div>
             <div>
               <span className="font-medium">Time:</span> {event.start_time} -{" "}

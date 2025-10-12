@@ -1,6 +1,13 @@
 // @ts-nocheck - Drip campaign fields not yet in database schema
 import { Database } from "@/types/supabase";
 import { SupabaseClient } from "@supabase/supabase-js";
+import { generateText } from "ai";
+import { anthropic } from "@ai-sdk/anthropic";
+import { ANTHROPIC_MODELS } from "@/constants";
+import { speakerAnnouncementPrompt } from "@/app/prompts/announcements/speaker-announcement";
+import { speakerAnnouncementReminderPrompt } from "@/app/prompts/announcements/speaker-announcement-reminder";
+import { AnnouncementService } from "@/lib/services/announcement-service";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
 
 type SpeakerRow = Database["public"]["Tables"]["speakers"]["Row"];
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
@@ -20,7 +27,7 @@ interface DripCampaignParams {
   userId: string;
   daysBeforeEvent?: number;
   startTime?: string; // HH:MM format
-  platform?: "linkedin" | "twitter" | "instagram";
+  platform?: "linkedin" | "twitter" | "instagram" | "all";
   avoidWeekends?: boolean;
 }
 
@@ -86,13 +93,28 @@ export class DripCampaignService {
   async createCampaign(
     params: DripCampaignParams
   ): Promise<CreateCampaignResult> {
+    // Validate API key
+    if (!process.env.ANTHROPIC_API_KEY) {
+      throw new Error("AI service not configured. Missing ANTHROPIC_API_KEY.");
+    }
+
     // Get preview first
     const preview = await this.previewCampaign(params);
 
-    const platform = params.platform || "linkedin";
+    // Fetch event for generating announcements
+    const event = await this.validateEventOwnership(params.eventId, params.userId);
+    const platformParam = params.platform || "linkedin";
     const warnings: string[] = [];
     let scheduledCount = 0;
     let skippedCount = 0;
+
+    const announcementService = new AnnouncementService(this.supabase);
+
+    // Determine which platforms to schedule to
+    const platforms: Array<"linkedin" | "twitter" | "instagram"> =
+      platformParam === "all"
+        ? ["linkedin", "twitter", "instagram"]
+        : [platformParam as "linkedin" | "twitter" | "instagram"];
 
     // For each speaker in the preview, create announcement and schedule
     for (const item of preview) {
@@ -105,30 +127,152 @@ export class DripCampaignService {
       }
 
       try {
-        // TODO: Generate announcement for this speaker
-        // For now, we'll assume announcements already exist
-        // In Phase 2, add auto-generation here
+        // Fetch speaker
+        const { data: speaker, error: speakerError } = await this.supabase
+          .from("speakers")
+          .select("*")
+          .eq("id", item.speakerId)
+          .single();
 
-        // Create scheduled post
-        const { error } = await this.supabase.from("scheduled_posts").insert({
-          user_id: params.userId,
-          event_id: params.eventId,
-          speaker_id: item.speakerId,
-          announcement_id: 0, // TODO: Link to actual announcement
-          scheduled_time: item.scheduledTime,
-          timezone: await this.getEventTimezone(params.eventId),
-          platform,
-          post_text: `Speaker announcement for ${item.speakerName}`, // Placeholder
-          status: "pending",
-        });
-
-        if (error) {
-          warnings.push(`Failed to schedule ${item.speakerName}: ${error.message}`);
+        if (speakerError || !speaker) {
+          warnings.push(`Failed to fetch speaker ${item.speakerName}`);
           skippedCount++;
-        } else {
-          scheduledCount++;
+          continue;
+        }
+
+        // Fetch speaker's primary image for all platforms
+        let primaryImageUrl: string | null = null;
+        const { data: images } = await this.supabase
+          .from("speaker_images")
+          .select("*")
+          .eq("speaker_id", item.speakerId)
+          .eq("is_primary", true)
+          .limit(1);
+
+        if (images && images.length > 0) {
+          primaryImageUrl = images[0].public_url;
+        }
+
+        // Instagram requires an image - skip it if no image available
+        if (platforms.includes("instagram") && !primaryImageUrl) {
+          warnings.push(
+            `Skipped Instagram for ${item.speakerName}: No primary image found`
+          );
+          // Continue with other platforms but skip Instagram
+        }
+
+        // Loop through each platform
+        for (const platform of platforms) {
+          // Skip Instagram if no image
+          if (platform === "instagram" && !primaryImageUrl) {
+            continue;
+          }
+
+          try {
+            // Step 1: Get or create initial announcement for this speaker/platform combo
+            let initialAnnouncement: string;
+            let announcementId: number;
+
+            // Check if speaker already has an announcement for this platform
+            const { data: existingAnnouncements } = await this.supabase
+              .from("announcements")
+              .select("*")
+              .eq("speaker_id", item.speakerId)
+              .eq("platform", platform)
+              .order("created_at", { ascending: false })
+              .limit(1);
+
+            if (existingAnnouncements && existingAnnouncements.length > 0) {
+              // Use existing announcement
+              initialAnnouncement = existingAnnouncements[0].announcement_text;
+              announcementId = existingAnnouncements[0].id;
+              console.log(`Using existing ${platform} announcement for ${item.speakerName}`);
+            } else {
+              // Generate new initial announcement
+              console.log(`Generating initial ${platform} announcement for ${item.speakerName}...`);
+              const initialPrompt = speakerAnnouncementPrompt(speaker, event);
+
+              const { text: generatedInitial } = await generateText({
+                model: anthropic(ANTHROPIC_MODELS["claude-opus-4.1"]),
+                messages: [{ role: "user", content: initialPrompt }],
+              });
+
+              initialAnnouncement = generatedInitial.trim();
+
+              // Save initial announcement
+              const savedAnnouncement = await announcementService.createAnnouncement({
+                speakerId: speaker.id,
+                eventId: event.id,
+                announcementText: initialAnnouncement,
+                platform,
+                template: "pre-event",
+                userId: params.userId,
+              });
+
+              announcementId = savedAnnouncement.id;
+              console.log(`Created initial ${platform} announcement ID: ${announcementId}`);
+            }
+
+            // Step 2: Generate reminder announcement for this specific scheduled time
+            console.log(
+              `Generating ${platform} reminder for ${item.speakerName} (${item.daysUntilEvent} days before)...`
+            );
+
+            const reminderPrompt = speakerAnnouncementReminderPrompt(
+              speaker,
+              event,
+              item.daysUntilEvent,
+              initialAnnouncement
+            );
+
+            const { text: reminderText } = await generateText({
+              model: anthropic(ANTHROPIC_MODELS["claude-opus-4.1"]),
+              messages: [{ role: "user", content: reminderPrompt }],
+            });
+
+            const finalReminderText = reminderText.trim();
+
+            // Step 3: Create scheduled post with generated reminder
+            // Include image for all platforms (LinkedIn, X, and Instagram all support images)
+            const { error } = await this.supabase.from("scheduled_posts").insert({
+              user_id: params.userId,
+              event_id: params.eventId,
+              speaker_id: item.speakerId,
+              announcement_id: announcementId,
+              scheduled_time: item.scheduledTime,
+              timezone: await this.getEventTimezone(params.eventId),
+              platform,
+              post_text: finalReminderText,
+              image_url: primaryImageUrl, // Include image for all platforms
+              status: "pending",
+            });
+
+            if (error) {
+              warnings.push(
+                `Failed to schedule ${item.speakerName} on ${platform}: ${error.message}`
+              );
+              skippedCount++;
+            } else {
+              scheduledCount++;
+              console.log(
+                `✓ Scheduled ${item.speakerName} on ${platform} for ${item.scheduledTime}`
+              );
+            }
+          } catch (platformError) {
+            console.error(
+              `Error scheduling ${item.speakerName} on ${platform}:`,
+              platformError
+            );
+            warnings.push(
+              `Error scheduling ${item.speakerName} on ${platform}: ${
+                platformError instanceof Error ? platformError.message : "Unknown error"
+              }`
+            );
+            skippedCount++;
+          }
         }
       } catch (error) {
+        console.error(`Error scheduling ${item.speakerName}:`, error);
         warnings.push(
           `Error scheduling ${item.speakerName}: ${
             error instanceof Error ? error.message : "Unknown error"
@@ -166,7 +310,14 @@ export class DripCampaignService {
   }): Promise<SchedulePreviewItem[]> {
     const { event, speakers, existingPosts, daysBeforeEvent, startTime, avoidWeekends } = params;
 
-    const eventDate = new Date(event.date);
+    // Get event timezone for proper date calculations
+    const timezone = event.timezone || "UTC";
+
+    // Parse event date correctly - avoid UTC conversion for date-only strings
+    // event.date is stored as "YYYY-MM-DD", parse components directly to avoid timezone shift
+    const [year, month, day] = event.date.split('-').map(Number);
+    const eventDate = new Date(year, month - 1, day);
+
     const preview: SchedulePreviewItem[] = [];
 
     // Sort speakers by creation order for consistent scheduling
@@ -174,30 +325,37 @@ export class DripCampaignService {
       (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
 
-    // Calculate posting interval in days
+    // Calculate posting interval in days to distribute speakers evenly
+    // For N speakers over D days before event:
+    // - If we have more days than speakers, spread them out (interval >= 1)
+    // - If we have more speakers than days, some will share days (interval < 1)
+    // Example: 3 speakers, 2 days before = intervals of 1 day (speakers at 2d, 1d, 0d)
+    // Example: 5 speakers, 2 days before = intervals of 0.5 days (some on same day)
     const totalSpeakers = sortedSpeakers.length;
-    const dayInterval = Math.max(1, Math.floor(daysBeforeEvent / totalSpeakers));
+    const dayInterval = daysBeforeEvent / Math.max(1, totalSpeakers - 1);
 
     for (let i = 0; i < sortedSpeakers.length; i++) {
       const speaker = sortedSpeakers[i];
-      const daysBeforeForThisSpeaker = daysBeforeEvent - i * dayInterval;
+      // Distribute speakers evenly: first speaker gets max days before
+      // Last speaker gets 0 days (posts on event day)
+      const daysBeforeForThisSpeaker = Math.max(0, daysBeforeEvent - i * dayInterval);
 
       // Calculate ideal posting time
       let idealDateTime = this.calculateIdealDateTime(
         eventDate,
         daysBeforeForThisSpeaker,
         startTime,
-        event.timezone
+        timezone
       );
 
       // Adjust for weekends if needed
       if (avoidWeekends) {
-        idealDateTime = this.adjustForWeekend(idealDateTime);
+        idealDateTime = this.adjustForWeekend(idealDateTime, timezone);
       }
 
       // Find available time slot
       const { scheduledTime, hasConflict, conflictReason } =
-        await this.findAvailableSlot(idealDateTime, existingPosts, preview);
+        await this.findAvailableSlot(idealDateTime, existingPosts, preview, timezone);
 
       preview.push({
         speakerId: speaker.id,
@@ -218,7 +376,8 @@ export class DripCampaignService {
   private async findAvailableSlot(
     idealTime: Date,
     existingPosts: ScheduledPostRow[],
-    alreadyScheduled: SchedulePreviewItem[]
+    alreadyScheduled: SchedulePreviewItem[],
+    timezone: string
   ): Promise<{
     scheduledTime: Date;
     hasConflict: boolean;
@@ -233,7 +392,7 @@ export class DripCampaignService {
     }
 
     // Try alternative times in posting window (±3 hours max)
-    const alternatives = this.generateAlternativeTimes(idealTime);
+    const alternatives = this.generateAlternativeTimes(idealTime, timezone);
 
     for (const altTime of alternatives) {
       if (
@@ -253,9 +412,10 @@ export class DripCampaignService {
   }
 
   /**
-   * Generate alternative posting times (±1 to ±3 hours)
+   * Generate alternative posting times (±1 to ±3 hours) within the posting window
+   * All time checks are done in the event's timezone
    */
-  private generateAlternativeTimes(baseTime: Date): Date[] {
+  private generateAlternativeTimes(baseTime: Date, timezone: string): Date[] {
     const alternatives: Date[] = [];
     const hourOffsets = [1, -1, 2, -2, 3, -3]; // Try closest first
 
@@ -263,8 +423,11 @@ export class DripCampaignService {
       const altTime = new Date(baseTime);
       altTime.setHours(altTime.getHours() + offset);
 
-      // Only include if within posting window
-      const hour = altTime.getHours();
+      // Convert to event timezone to check the hour
+      const altTimeInZone = toZonedTime(altTime, timezone);
+      const hour = altTimeInZone.getHours();
+
+      // Only include if within posting window (8am-3pm in event timezone)
       if (hour >= this.POSTING_WINDOW_START && hour < this.POSTING_WINDOW_END) {
         alternatives.push(altTime);
       }
@@ -322,7 +485,8 @@ export class DripCampaignService {
   }
 
   /**
-   * Calculate ideal posting datetime
+   * Calculate ideal posting datetime in the event's timezone
+   * This ensures all scheduling is done relative to the event's local time
    */
   private calculateIdealDateTime(
     eventDate: Date,
@@ -330,21 +494,39 @@ export class DripCampaignService {
     startTime: string,
     timezone: string
   ): Date {
-    const postingDate = new Date(eventDate);
+    // Convert event date to the event's timezone to get accurate date components
+    const eventInZone = toZonedTime(eventDate, timezone);
+
+    // Extract year, month, day from the event date in the event's timezone
+    const year = eventInZone.getFullYear();
+    const month = eventInZone.getMonth();
+    const day = eventInZone.getDate();
+
+    // Create a date representing the posting day in the event's timezone
+    // This is a native Date object but we treat it as representing wall-clock time
+    const postingDate = new Date(year, month, day);
     postingDate.setDate(postingDate.getDate() - daysBeforeEvent);
 
-    // Parse time (format: "HH:MM:SS")
+    // Parse time (format: "HH:MM:SS" or "HH:MM")
     const [hours, minutes] = startTime.split(":").map(Number);
-    postingDate.setHours(hours, minutes, 0, 0);
 
-    return postingDate;
+    // Set the time components on the posting date
+    postingDate.setHours(hours, minutes || 0, 0, 0);
+
+    // Now we have a Date object where the components (year, month, day, hour, minute)
+    // represent the intended wall-clock time in the event's timezone.
+    // Use fromZonedTime to convert this wall-clock time to UTC
+    return fromZonedTime(postingDate, timezone);
   }
 
   /**
    * Adjust date to next weekday if it falls on a weekend
+   * Checks day of week in the event's timezone
    */
-  private adjustForWeekend(date: Date): Date {
-    const dayOfWeek = date.getDay();
+  private adjustForWeekend(date: Date, timezone: string): Date {
+    // Convert to event timezone to check the day of week
+    const dateInZone = toZonedTime(date, timezone);
+    const dayOfWeek = dateInZone.getDay();
 
     // 0 = Sunday, 6 = Saturday
     if (dayOfWeek === 0) {

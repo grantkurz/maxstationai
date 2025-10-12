@@ -16,7 +16,9 @@ import { PostToLinkedInDialog } from "./PostToLinkedInDialog";
 import { PostToXDialog } from "./PostToXDialog";
 import { PostToInstagramDialog } from "./PostToInstagramDialog";
 import { SchedulePostDialog } from "./SchedulePostDialog";
-import { Send, Calendar, Loader2 } from "lucide-react";
+import { PostAllDialog } from "./PostAllDialog";
+import { ScheduleAllDialog } from "./ScheduleAllDialog";
+import { Send, Calendar, Loader2, Sparkles } from "lucide-react";
 import { Database } from "@/types/supabase";
 
 type Speaker = Database["public"]["Tables"]["speakers"]["Row"];
@@ -41,6 +43,8 @@ export function SpeakerCardWithActions({
   const [xPostDialogOpen, setXPostDialogOpen] = useState(false);
   const [instagramPostDialogOpen, setInstagramPostDialogOpen] = useState(false);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [postAllDialogOpen, setPostAllDialogOpen] = useState(false);
+  const [scheduleAllDialogOpen, setScheduleAllDialogOpen] = useState(false);
   const [primaryImageUrl, setPrimaryImageUrl] = useState<string | null>(null);
   const [selectedPlatform, setSelectedPlatform] = useState<"linkedin" | "twitter" | "instagram">("linkedin");
 
@@ -152,6 +156,30 @@ export function SpeakerCardWithActions({
     }
     setSelectedPlatform(platform);
     setScheduleDialogOpen(true);
+  };
+
+  const handleOpenPostAll = () => {
+    if (!announcement) {
+      toast({
+        title: "No announcement",
+        description: "Please generate an announcement first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setPostAllDialogOpen(true);
+  };
+
+  const handleOpenScheduleAll = () => {
+    if (!announcement) {
+      toast({
+        title: "No announcement",
+        description: "Please generate an announcement first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setScheduleAllDialogOpen(true);
   };
 
   const handleSuccess = () => {
@@ -285,6 +313,31 @@ export function SpeakerCardWithActions({
                     </Button>
                   </div>
                 </div>
+
+                {/* Separator */}
+                <div className="border-t my-2" />
+
+                {/* Post All & Schedule All Buttons */}
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    onClick={handleOpenPostAll}
+                    variant="default"
+                    size="sm"
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                  >
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    Post All
+                  </Button>
+                  <Button
+                    onClick={handleOpenScheduleAll}
+                    variant="outline"
+                    size="sm"
+                    className="w-full border-purple-200 hover:bg-purple-50"
+                  >
+                    <Calendar className="h-3 w-3 mr-1" />
+                    Schedule All
+                  </Button>
+                </div>
               </div>
             ) : (
               <p className="text-xs text-muted-foreground text-center py-2">
@@ -338,6 +391,24 @@ export function SpeakerCardWithActions({
             onOpenChange={setScheduleDialogOpen}
             announcement={{...announcement, platform: selectedPlatform}}
             existingSchedules={scheduledPosts}
+            onSuccess={handleSuccess}
+          />
+
+          {/* Post All Dialog */}
+          <PostAllDialog
+            open={postAllDialogOpen}
+            onOpenChange={setPostAllDialogOpen}
+            announcement={{...announcement, speaker_id: speaker.id}}
+            primaryImageUrl={primaryImageUrl}
+            onSuccess={handleSuccess}
+          />
+
+          {/* Schedule All Dialog */}
+          <ScheduleAllDialog
+            open={scheduleAllDialogOpen}
+            onOpenChange={setScheduleAllDialogOpen}
+            announcement={announcement}
+            primaryImageUrl={primaryImageUrl}
             onSuccess={handleSuccess}
           />
         </>
