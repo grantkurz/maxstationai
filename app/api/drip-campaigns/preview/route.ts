@@ -10,7 +10,7 @@ interface PreviewRequest {
   eventId: number;
   daysBeforeEvent?: number;
   startTime?: string;
-  platform?: "linkedin" | "twitter" | "instagram";
+  platform?: "linkedin" | "twitter" | "instagram" | "all";
   avoidWeekends?: boolean;
 }
 

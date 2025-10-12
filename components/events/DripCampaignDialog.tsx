@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, Calendar, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Loader2, Calendar, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
@@ -43,6 +43,15 @@ interface PreviewItem {
   conflictReason?: string;
 }
 
+interface ContentPreview {
+  speakerId: number;
+  speakerName: string;
+  daysUntilEvent: number;
+  generatedAnnouncement: string;
+  characterCount: number;
+  hasExistingAnnouncement: boolean;
+}
+
 export function DripCampaignDialog({
   event,
   speakerCount,
@@ -56,14 +65,17 @@ export function DripCampaignDialog({
   // Configuration state
   const [daysBeforeEvent, setDaysBeforeEvent] = useState(7);
   const [startTime, setStartTime] = useState("10:00");
-  const [platform, setPlatform] = useState<"linkedin" | "twitter" | "instagram">(
-    "linkedin"
+  const [platform, setPlatform] = useState<"linkedin" | "twitter" | "instagram" | "all">(
+    "all"
   );
   const [avoidWeekends, setAvoidWeekends] = useState(true);
 
   // Preview state
   const [preview, setPreview] = useState<PreviewItem[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [contentPreviews, setContentPreviews] = useState<ContentPreview[]>([]);
+  const [loadingContent, setLoadingContent] = useState(false);
+  const [expandedSpeakers, setExpandedSpeakers] = useState<Set<number>>(new Set());
 
   const handlePreview = async () => {
     setIsLoading(true);
@@ -158,13 +170,90 @@ export function DripCampaignDialog({
     setStep("config");
     setPreview([]);
     setWarnings([]);
+    setContentPreviews([]);
+    setExpandedSpeakers(new Set());
+  };
+
+  const handlePreviewContent = async () => {
+    setLoadingContent(true);
+
+    try {
+      // Filter out speakers with conflicts
+      const schedulableSpeakers = preview.filter((p) => !p.hasConflict);
+
+      const response = await fetch("/api/drip-campaigns/preview-content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventId: event.id,
+          speakerIds: schedulableSpeakers.map((p) => p.speakerId),
+          daysUntilEvent: schedulableSpeakers.map((p) => p.daysUntilEvent),
+          platform,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to generate content preview");
+      }
+
+      setContentPreviews(data.previews || []);
+
+      toast({
+        title: "Content Previews Generated!",
+        description: `Generated ${data.previews.length} announcement previews`,
+      });
+    } catch (error) {
+      console.error("Error generating content preview:", error);
+      toast({
+        title: "Preview Failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to generate content preview",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingContent(false);
+    }
+  };
+
+  const toggleSpeakerExpanded = (speakerId: number) => {
+    const newExpanded = new Set(expandedSpeakers);
+    if (newExpanded.has(speakerId)) {
+      newExpanded.delete(speakerId);
+    } else {
+      newExpanded.add(speakerId);
+    }
+    setExpandedSpeakers(newExpanded);
   };
 
   const formatDateTime = (isoString: string) => {
     const date = new Date(isoString);
+
+    // Format date using UTC to prevent timezone shift
+    // This ensures the date displays as intended regardless of user's timezone
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth();
+    const day = date.getUTCDate();
+    const hours = date.getUTCHours();
+    const minutes = date.getUTCMinutes();
+
+    // Create a date in the user's local timezone but with the UTC values
+    const localDate = new Date(year, month, day, hours, minutes);
+
     return {
-      date: date.toLocaleDateString(),
-      time: date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      date: localDate.toLocaleDateString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      }),
+      time: localDate.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit"
+      }),
     };
   };
 
@@ -230,7 +319,7 @@ export function DripCampaignDialog({
                 <Label htmlFor="platform">Platform</Label>
                 <Select
                   value={platform}
-                  onValueChange={(value: "linkedin" | "twitter" | "instagram") =>
+                  onValueChange={(value: "linkedin" | "twitter" | "instagram" | "all") =>
                     setPlatform(value)
                   }
                 >
@@ -238,11 +327,22 @@ export function DripCampaignDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="all">
+                      <span className="flex items-center gap-2">
+                        <Sparkles className="h-3 w-3" />
+                        All Platforms (LinkedIn, X, Instagram)
+                      </span>
+                    </SelectItem>
                     <SelectItem value="linkedin">LinkedIn</SelectItem>
                     <SelectItem value="twitter">Twitter/X</SelectItem>
                     <SelectItem value="instagram">Instagram</SelectItem>
                   </SelectContent>
                 </Select>
+                {platform === "all" && (
+                  <p className="text-xs text-muted-foreground">
+                    Will schedule to LinkedIn, X, and Instagram simultaneously
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center justify-between space-x-2">
@@ -294,15 +394,63 @@ export function DripCampaignDialog({
                   </p>
                   <p>📅 Starting {daysBeforeEvent} days before event</p>
                   <p>⏰ Around {startTime} daily</p>
-                  <p>📱 Platform: {platform}</p>
+                  <p>
+                    📱 Platform:{" "}
+                    {platform === "all" ? (
+                      <span className="font-medium">All (LinkedIn, X, Instagram)</span>
+                    ) : (
+                      platform
+                    )}
+                  </p>
+                  {platform === "all" && (
+                    <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                      ⚠️ Instagram requires speaker images. Ensure speakers have primary images set.
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-2 pt-2 border-t">
+                    🤖 AI will generate unique reminder announcements for each
+                    speaker based on days until event
+                  </p>
+                  {platform === "all" && (
+                    <p className="text-xs text-muted-foreground">
+                      💎 Each platform will receive {schedulableCount * 3} total posts
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div className="space-y-2">
-                <h4 className="font-medium">Schedule</h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium">Schedule</h4>
+                  {schedulableCount > 0 && contentPreviews.length === 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePreviewContent}
+                      disabled={loadingContent}
+                    >
+                      {loadingContent ? (
+                        <>
+                          <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="mr-2 h-3 w-3" />
+                          Preview Content
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
                 <div className="border rounded-lg divide-y max-h-96 overflow-y-auto">
                   {preview.map((item) => {
                     const { date, time } = formatDateTime(item.scheduledTime);
+                    const contentPreview = contentPreviews.find(
+                      (cp) => cp.speakerId === item.speakerId
+                    );
+                    const isExpanded = expandedSpeakers.has(item.speakerId);
+
                     return (
                       <div
                         key={item.speakerId}
@@ -326,6 +474,40 @@ export function DripCampaignDialog({
                             {item.daysUntilEvent}d before
                           </div>
                         </div>
+
+                        {/* Show content preview if available */}
+                        {contentPreview && (
+                          <div className="mt-3 space-y-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleSpeakerExpanded(item.speakerId)}
+                              className="h-8 px-2 text-xs w-full justify-between"
+                            >
+                              <span className="flex items-center gap-1">
+                                <Sparkles className="h-3 w-3" />
+                                AI-Generated Announcement ({contentPreview.characterCount} chars)
+                              </span>
+                              {isExpanded ? (
+                                <ChevronUp className="h-3 w-3" />
+                              ) : (
+                                <ChevronDown className="h-3 w-3" />
+                              )}
+                            </Button>
+
+                            {isExpanded && (
+                              <div className="bg-muted/50 p-3 rounded-lg text-xs whitespace-pre-wrap max-h-64 overflow-y-auto">
+                                {contentPreview.generatedAnnouncement}
+                              </div>
+                            )}
+
+                            {contentPreview.hasExistingAnnouncement && (
+                              <p className="text-xs text-muted-foreground">
+                                ℹ️ Based on existing announcement
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -337,9 +519,17 @@ export function DripCampaignDialog({
           {step === "creating" && (
             <div className="flex flex-col items-center justify-center py-12 space-y-4">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">
-                Scheduling speaker announcements...
-              </p>
+              <div className="text-center space-y-2">
+                <p className="text-sm font-medium">
+                  Creating your drip campaign...
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Generating AI-powered reminder announcements for each speaker
+                </p>
+                <p className="text-xs text-muted-foreground italic">
+                  This may take a minute for multiple speakers
+                </p>
+              </div>
             </div>
           )}
         </div>

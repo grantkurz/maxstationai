@@ -1,6 +1,13 @@
 // @ts-nocheck - Drip campaign fields not yet in database schema
 import { Database } from "@/types/supabase";
 import { SupabaseClient } from "@supabase/supabase-js";
+import { generateText } from "ai";
+import { anthropic } from "@ai-sdk/anthropic";
+import { ANTHROPIC_MODELS } from "@/constants";
+import { speakerAnnouncementPrompt } from "@/app/prompts/announcements/speaker-announcement";
+import { speakerAnnouncementReminderPrompt } from "@/app/prompts/announcements/speaker-announcement-reminder";
+import { AnnouncementService } from "@/lib/services/announcement-service";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
 
 type SpeakerRow = Database["public"]["Tables"]["speakers"]["Row"];
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
@@ -20,7 +27,7 @@ interface DripCampaignParams {
   userId: string;
   daysBeforeEvent?: number;
   startTime?: string; // HH:MM format
-  platform?: "linkedin" | "twitter" | "instagram";
+  platform?: "linkedin" | "twitter" | "instagram" | "all";
   avoidWeekends?: boolean;
 }
 
@@ -86,13 +93,28 @@ export class DripCampaignService {
   async createCampaign(
     params: DripCampaignParams
   ): Promise<CreateCampaignResult> {
+    // Validate API key
+    if (!process.env.ANTHROPIC_API_KEY) {
+      throw new Error("AI service not configured. Missing ANTHROPIC_API_KEY.");
+    }
+
     // Get preview first
     const preview = await this.previewCampaign(params);
 
-    const platform = params.platform || "linkedin";
+    // Fetch event for generating announcements
+    const event = await this.validateEventOwnership(params.eventId, params.userId);
+    const platformParam = params.platform || "linkedin";
     const warnings: string[] = [];
     let scheduledCount = 0;
     let skippedCount = 0;
+
+    const announcementService = new AnnouncementService(this.supabase);
+
+    // Determine which platforms to schedule to
+    const platforms: Array<"linkedin" | "twitter" | "instagram"> =
+      platformParam === "all"
+        ? ["linkedin", "twitter", "instagram"]
+        : [platformParam as "linkedin" | "twitter" | "instagram"];
 
     // For each speaker in the preview, create announcement and schedule
     for (const item of preview) {
@@ -105,30 +127,152 @@ export class DripCampaignService {
       }
 
       try {
-        // TODO: Generate announcement for this speaker
-        // For now, we'll assume announcements already exist
-        // In Phase 2, add auto-generation here
+        // Fetch speaker
+        const { data: speaker, error: speakerError } = await this.supabase
+          .from("speakers")
+          .select("*")
+          .eq("id", item.speakerId)
+          .single();
 
-        // Create scheduled post
-        const { error } = await this.supabase.from("scheduled_posts").insert({
-          user_id: params.userId,
-          event_id: params.eventId,
-          speaker_id: item.speakerId,
-          announcement_id: 0, // TODO: Link to actual announcement
-          scheduled_time: item.scheduledTime,
-          timezone: await this.getEventTimezone(params.eventId),
-          platform,
-          post_text: `Speaker announcement for ${item.speakerName}`, // Placeholder
-          status: "pending",
-        });
-
-        if (error) {
-          warnings.push(`Failed to schedule ${item.speakerName}: ${error.message}`);
+        if (speakerError || !speaker) {
+          warnings.push(`Failed to fetch speaker ${item.speakerName}`);
           skippedCount++;
-        } else {
-          scheduledCount++;
+          continue;
+        }
+
+        // Check if speaker has a primary image (needed for Instagram)
+        let primaryImageUrl: string | null = null;
+        if (platforms.includes("instagram")) {
+          const { data: images } = await this.supabase
+            .from("speaker_images")
+            .select("*")
+            .eq("speaker_id", item.speakerId)
+            .eq("is_primary", true)
+            .limit(1);
+
+          if (images && images.length > 0) {
+            primaryImageUrl = images[0].public_url;
+          }
+
+          if (!primaryImageUrl) {
+            warnings.push(
+              `Skipped Instagram for ${item.speakerName}: No primary image found`
+            );
+            // Continue with other platforms but skip Instagram
+          }
+        }
+
+        // Loop through each platform
+        for (const platform of platforms) {
+          // Skip Instagram if no image
+          if (platform === "instagram" && !primaryImageUrl) {
+            continue;
+          }
+
+          try {
+            // Step 1: Get or create initial announcement for this speaker/platform combo
+            let initialAnnouncement: string;
+            let announcementId: number;
+
+            // Check if speaker already has an announcement for this platform
+            const { data: existingAnnouncements } = await this.supabase
+              .from("announcements")
+              .select("*")
+              .eq("speaker_id", item.speakerId)
+              .eq("platform", platform)
+              .order("created_at", { ascending: false })
+              .limit(1);
+
+            if (existingAnnouncements && existingAnnouncements.length > 0) {
+              // Use existing announcement
+              initialAnnouncement = existingAnnouncements[0].announcement_text;
+              announcementId = existingAnnouncements[0].id;
+              console.log(`Using existing ${platform} announcement for ${item.speakerName}`);
+            } else {
+              // Generate new initial announcement
+              console.log(`Generating initial ${platform} announcement for ${item.speakerName}...`);
+              const initialPrompt = speakerAnnouncementPrompt(speaker, event);
+
+              const { text: generatedInitial } = await generateText({
+                model: anthropic(ANTHROPIC_MODELS["claude-opus-4.1"]),
+                messages: [{ role: "user", content: initialPrompt }],
+              });
+
+              initialAnnouncement = generatedInitial.trim();
+
+              // Save initial announcement
+              const savedAnnouncement = await announcementService.createAnnouncement({
+                speakerId: speaker.id,
+                eventId: event.id,
+                announcementText: initialAnnouncement,
+                platform,
+                template: "pre-event",
+                userId: params.userId,
+              });
+
+              announcementId = savedAnnouncement.id;
+              console.log(`Created initial ${platform} announcement ID: ${announcementId}`);
+            }
+
+            // Step 2: Generate reminder announcement for this specific scheduled time
+            console.log(
+              `Generating ${platform} reminder for ${item.speakerName} (${item.daysUntilEvent} days before)...`
+            );
+
+            const reminderPrompt = speakerAnnouncementReminderPrompt(
+              speaker,
+              event,
+              item.daysUntilEvent,
+              initialAnnouncement
+            );
+
+            const { text: reminderText } = await generateText({
+              model: anthropic(ANTHROPIC_MODELS["claude-opus-4.1"]),
+              messages: [{ role: "user", content: reminderPrompt }],
+            });
+
+            const finalReminderText = reminderText.trim();
+
+            // Step 3: Create scheduled post with generated reminder
+            const { error } = await this.supabase.from("scheduled_posts").insert({
+              user_id: params.userId,
+              event_id: params.eventId,
+              speaker_id: item.speakerId,
+              announcement_id: announcementId,
+              scheduled_time: item.scheduledTime,
+              timezone: await this.getEventTimezone(params.eventId),
+              platform,
+              post_text: finalReminderText,
+              image_url: platform === "instagram" ? primaryImageUrl : null,
+              status: "pending",
+            });
+
+            if (error) {
+              warnings.push(
+                `Failed to schedule ${item.speakerName} on ${platform}: ${error.message}`
+              );
+              skippedCount++;
+            } else {
+              scheduledCount++;
+              console.log(
+                `✓ Scheduled ${item.speakerName} on ${platform} for ${item.scheduledTime}`
+              );
+            }
+          } catch (platformError) {
+            console.error(
+              `Error scheduling ${item.speakerName} on ${platform}:`,
+              platformError
+            );
+            warnings.push(
+              `Error scheduling ${item.speakerName} on ${platform}: ${
+                platformError instanceof Error ? platformError.message : "Unknown error"
+              }`
+            );
+            skippedCount++;
+          }
         }
       } catch (error) {
+        console.error(`Error scheduling ${item.speakerName}:`, error);
         warnings.push(
           `Error scheduling ${item.speakerName}: ${
             error instanceof Error ? error.message : "Unknown error"

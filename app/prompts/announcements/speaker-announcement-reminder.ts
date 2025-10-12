@@ -117,6 +117,8 @@ ${speaker.session_description}
 👤 Bio:
 Rob Greenberg is a Product Manager at Neural Magic (acquired by Red Hat) with three years of experience focused on building inference engines that accelerate AI inference through optimized, open-source models. A Tufts University Computer Science graduate (2019), Rob previously served as a Technology Consultant at Accenture and Digital Product Manager at Rocketbook.
 
+🎟️ Signup here: https://luma.com/f9g7g80e
+
 🎓 Perfect for AI developers, business leaders, policymakers, and anyone interested in the ethical implications of AI technology.
 """
 
@@ -135,6 +137,8 @@ Rob Greenberg is a Product Manager at Neural Magic (acquired by Red Hat) with th
 As a Product Manager at Neural Magic (now part of Red Hat), Rob brings deep expertise in accelerating AI inference. With a Computer Science degree from Tufts and prior experience at Accenture and Rocketbook, he's at the forefront of open-source AI optimization.
 
 💼 Whether you're building AI products, managing tech teams, or shaping AI policy, this session offers invaluable insights.
+
+🎟️ Signup here: https://luma.com/f9g7g80e
 
 📅 Date: October 1st, 2024
 ⏰ Time: 6:30pm to 9:30pm EST
