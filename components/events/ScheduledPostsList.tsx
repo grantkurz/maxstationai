@@ -25,8 +25,10 @@ import {
   Calendar,
   Filter,
   ExternalLink,
+  Pencil,
 } from "lucide-react";
 import { Database } from "@/types/supabase";
+import { EditScheduledPostDialog } from "./EditScheduledPostDialog";
 
 type ScheduledPost = Database["public"]["Tables"]["scheduled_posts"]["Row"];
 type Speaker = Database["public"]["Tables"]["speakers"]["Row"];
@@ -81,6 +83,7 @@ export function ScheduledPostsList({
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [retryingId, setRetryingId] = useState<number | null>(null);
+  const [editingPost, setEditingPost] = useState<ScheduledPost | null>(null);
 
   // Filter posts
   const filteredPosts = scheduledPosts.filter((post) => {
@@ -237,6 +240,16 @@ export function ScheduledPostsList({
         </div>
       </div>
 
+      {/* Edit Dialog */}
+      {editingPost && (
+        <EditScheduledPostDialog
+          post={editingPost}
+          open={!!editingPost}
+          onOpenChange={(open) => !open && setEditingPost(null)}
+          onUpdate={onUpdate}
+        />
+      )}
+
       {/* Table */}
       {sortedPosts.length === 0 ? (
         <div className="text-center py-12 border rounded-lg bg-muted/20">
@@ -360,20 +373,31 @@ export function ScheduledPostsList({
                         )}
 
                         {post.status === "pending" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCancel(post.id)}
-                            disabled={cancellingId === post.id}
-                          >
-                            {cancellingId === post.id ? (
-                              <RefreshCw className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </>
-                            )}
-                          </Button>
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditingPost(post)}
+                              title="Edit schedule time"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCancel(post.id)}
+                              disabled={cancellingId === post.id}
+                              title="Cancel schedule"
+                            >
+                              {cancellingId === post.id ? (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </>
+                              )}
+                            </Button>
+                          </>
                         )}
                       </div>
                     </TableCell>
